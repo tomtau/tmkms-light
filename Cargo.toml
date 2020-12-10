@@ -18,5 +18,5 @@ thiserror = "1"
 tracing = "0.1"
 
 [workspace]
-members = ["providers/softsign"]
+members = ["providers/softsign", "providers/sgx/sgx-app", "providers/sgx/sgx-runner"]
 default-members = ["providers/softsign"]
