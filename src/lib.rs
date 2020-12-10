@@ -1,6 +1,6 @@
-mod chain;
-mod config;
-mod connection;
-mod error;
+pub mod chain;
+pub mod config;
+pub mod connection;
+pub mod error;
 mod rpc;
-mod session;
+pub mod session;

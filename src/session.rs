@@ -6,14 +6,13 @@ use crate::{
     rpc::{ChainIdErrorType, DoubleSignErrorType, Request, Response},
 };
 use anomaly::{fail, format_err};
-use ed25519_dalek::{Keypair, Signature, Signer};
-use std::borrow::BorrowMut;
+use ed25519_dalek::{Keypair, Signer};
 use std::time::Instant;
 use tendermint_proto::privval::PingResponse;
 use tracing::{debug, error, info};
 
 /// Encrypted or plain session with a validator node
-pub struct Session {
+pub struct Session<S: PersistStateSync> {
     /// Validator configuration options
     config: ValidatorConfig,
 
@@ -27,10 +26,26 @@ pub struct Session {
     state: State,
 
     /// consensus state persistence
-    state_syncer: Box<dyn PersistStateSync>,
+    state_syncer: S,
 }
 
-impl Session {
+impl<S: PersistStateSync> Session<S> {
+    pub fn new(
+        config: ValidatorConfig,
+        connection: Box<dyn Connection>,
+        signing_key: Keypair,
+        state: State,
+        state_syncer: S,
+    ) -> Self {
+        Self {
+            config,
+            connection,
+            signing_key,
+            state,
+            state_syncer,
+        }
+    }
+
     /// Check chain id matches the configured one
     fn check_chain_id(&self, chain_id: &tendermint::chain::Id) -> Result<(), Error> {
         if chain_id == &self.config.chain_id {
@@ -57,8 +72,14 @@ impl Session {
         Ok(())
     }
 
+    /// Main request loop
+    pub fn request_loop(&mut self) -> Result<(), Error> {
+        while self.handle_request()? {}
+        Ok(())
+    }
+
     /// Handle an incoming request from the validator
-    fn handle_request(&'static mut self) -> Result<bool, Error> {
+    fn handle_request(&mut self) -> Result<bool, Error> {
         let request = Request::read(&mut self.connection)?;
         debug!(
             "[{}] received request: {:?}",
@@ -72,10 +93,10 @@ impl Session {
                     self.check_max_height(req.proposal.height.into())?;
                     let request_state = State::from(req.clone());
                     let req_cs = request_state.consensus_state();
-                    match self.state.check_update_consensus_state(
-                        req_cs.clone(),
-                        self.state_syncer.borrow_mut(),
-                    ) {
+                    match self
+                        .state
+                        .check_update_consensus_state(req_cs.clone(), &mut self.state_syncer)
+                    {
                         Ok(_) => {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
                                 format_err!(
@@ -122,12 +143,11 @@ impl Session {
                 } else {
                     self.check_max_height(req.vote.height.into())?;
                     let request_state = State::from(req.clone());
-
                     let req_cs = request_state.consensus_state();
-                    match self.state.check_update_consensus_state(
-                        req_cs.clone(),
-                        self.state_syncer.borrow_mut(),
-                    ) {
+                    match self
+                        .state
+                        .check_update_consensus_state(req_cs.clone(), &mut self.state_syncer)
+                    {
                         Ok(_) => {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
                                 format_err!(

@@ -1,8 +1,8 @@
 mod error;
 pub use self::error::{StateError, StateErrorKind};
 use anomaly::fail;
-use tendermint::{consensus, proposal::SignProposalRequest, vote::SignVoteRequest};
-
+pub use tendermint::consensus;
+use tendermint::{proposal::SignProposalRequest, vote::SignVoteRequest};
 /// State tracking for double signing prevention
 pub struct State {
     consensus_state: consensus::State,
@@ -95,15 +95,21 @@ impl State {
     }
 
     /// Update the state + check
-    pub fn check_update_consensus_state(
+    pub fn check_update_consensus_state<S: PersistStateSync>(
         &mut self,
         new_state: consensus::State,
-        syncer: &mut dyn PersistStateSync,
+        syncer: &mut S,
     ) -> Result<(), StateError> {
         self.check_consensus_state(&new_state)?;
         syncer.persist_state(&new_state)?;
         self.consensus_state = new_state;
         Ok(())
+    }
+}
+
+impl From<consensus::State> for State {
+    fn from(consensus_state: consensus::State) -> Self {
+        Self { consensus_state }
     }
 }
 

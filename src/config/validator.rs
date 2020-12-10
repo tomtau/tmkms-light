@@ -1,7 +1,7 @@
 //! Validator configuration
 
 use serde::{Deserialize, Serialize};
-use tendermint::{chain, net};
+use tendermint::chain;
 
 /// Validator configuration
 #[derive(Clone, Debug, Deserialize, Serialize)]
