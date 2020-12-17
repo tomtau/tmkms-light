@@ -9,6 +9,10 @@ serde = { version = "1", features = ["derive"] }
 ed25519 = { version = "1", features = ["serde"] }
 sgx-isa = "0.3"
 thiserror = "1"
+tendermint = { version = "=0.17.0-rc3" }
+tmkms-light = { path = "../../.." }
+secrecy = { version = "0.7", features = ["serde"] }
+zeroize = "1"
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 aesm-client = { version = "0.5", features = ["sgxs"] }

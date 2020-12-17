@@ -5,8 +5,17 @@ authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>", "Linfeng Yu
 edition = "2018"
 
 [target.'cfg(target_env = "sgx")'.dependencies]
+anomaly = "0.2"
+bincode = "1"
 ed25519-dalek = "1"
 rand = "0.7"
 aes-gcm-siv = "0.9"
+subtle = "2"
 sgx-isa = { version = "0.3", features = ["sgxstd"] }
 zeroize = "1"
+tendermint-p2p = { version = "=0.17.0-rc3" }
+
+tmkms-light-sgx-runner = { path = "../sgx-runner" }
+tmkms-light = { path = "../../.." }
+tracing = "0.1"
+tracing-subscriber = "0.2"

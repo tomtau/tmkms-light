@@ -5,6 +5,7 @@ use rand::rngs::OsRng;
 use rand::RngCore;
 use sgx_isa::{ErrorCode, Keyname, Keypolicy, Keyrequest, Report};
 use std::convert::TryInto;
+use tmkms_light_sgx_runner::SealedKeyData;
 use zeroize::Zeroize;
 
 /// Seals the provided ed25519 keypair with `Aes128GcmSiv`
@@ -46,7 +47,7 @@ pub fn seal(csprng: &mut OsRng, keypair: &Keypair) -> Result<SealedKeyData, Erro
 /// Checks the provided keyrequests
 /// and attempts to unseal the ed25519 keypair with `Aes128GcmSiv`
 pub fn unseal(sealed_data: &SealedKeyData) -> Result<Keypair, ErrorCode> {
-    if sealed_data.seal_key_request.keyname != (Keyname::Seal as _) {
+    if sealed_data.seal_key_request.keyname != (Keyname::Seal as u16) {
         return Err(ErrorCode::InvalidKeyname);
     }
     if let Ok(public) = PublicKey::from_bytes(&sealed_data.seal_key_request.keyid) {
