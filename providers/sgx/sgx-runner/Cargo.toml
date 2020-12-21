@@ -15,7 +15,15 @@ secrecy = { version = "0.7", features = ["serde"] }
 zeroize = "1"
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
+anomaly = "0.2"
 aesm-client = { version = "0.5", features = ["sgxs"] }
+bincode = "1"
 enclave-runner = "0.4"
+serde_json = "1"
 sgxs-loaders = "0.3"
+structopt = "0.3"
+tempfile = "3"
 tokio = { version = "= 0.2", features = ["uds"] }
+toml = "0.5"
+tracing = "0.1"
+tracing-subscriber = "0.2"

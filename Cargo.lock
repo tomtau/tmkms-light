@@ -1782,16 +1782,24 @@ name = "tmkms-light-sgx-runner"
 version = "0.1.0"
 dependencies = [
  "aesm-client",
+ "anomaly",
+ "bincode",
  "ed25519",
  "enclave-runner",
  "secrecy",
  "serde",
+ "serde_json",
  "sgx-isa",
  "sgxs-loaders",
+ "structopt",
+ "tempfile",
  "tendermint",
  "thiserror",
  "tmkms-light",
  "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
  "zeroize",
 ]
 
