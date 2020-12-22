@@ -1792,6 +1792,7 @@ dependencies = [
  "sgx-isa",
  "sgxs-loaders",
  "structopt",
+ "subtle-encoding",
  "tempfile",
  "tendermint",
  "thiserror",

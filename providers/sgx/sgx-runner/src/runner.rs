@@ -1,4 +1,4 @@
-use crate::shared::{SealedKeyData, SgxInitRequest, SgxInitResponse};
+use crate::shared::{RemoteConnectionConfig, SealedKeyData, SgxInitRequest, SgxInitResponse};
 use crate::state::StateSyncer;
 use aesm_client::AesmClient;
 use enclave_runner::{
@@ -6,10 +6,14 @@ use enclave_runner::{
     EnclaveBuilder,
 };
 use sgxs_loaders::isgx::Device;
+use std::fs;
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::thread;
 use std::{future::Future, io, pin::Pin};
+use tendermint::net;
+use tmkms_light::config::validator::ValidatorConfig;
+
 /// type alias for outputs in UsercallExtension async return type
 type UserCallStream = io::Result<Option<Box<dyn AsyncStream>>>;
 
@@ -111,12 +115,52 @@ impl TmkmsSgxSigner {
             Ok(SgxInitResponse {
                 sealed_key_data, ..
             }) => {
-                self.enclave_app_thread
-                    .join()
-                    .expect("enclave thread finished");
+                self.enclave_app_thread.join().map_err(|_| ())?;
                 Ok(sealed_key_data)
             }
             _ => Err(()),
         }
+    }
+
+    /// run the main privval handling
+    pub fn start<P: AsRef<Path>>(
+        self,
+        sealed_key_path: P,
+        config: ValidatorConfig,
+        remote_conn: Option<(net::Address, P)>,
+    ) -> Result<(), ()> {
+        let sealed_key: SealedKeyData =
+            bincode::deserialize(&fs::read(sealed_key_path).map_err(|_| ())?).map_err(|_| ())?;
+        let secret_connection = match remote_conn {
+            Some((
+                net::Address::Tcp {
+                    peer_id,
+                    host,
+                    port,
+                },
+                id_path,
+            )) => {
+                let sealed_id_key: SealedKeyData =
+                    bincode::deserialize(&fs::read(id_path).map_err(|_| ())?).map_err(|_| ())?;
+                Some(RemoteConnectionConfig {
+                    peer_id,
+                    host,
+                    port,
+                    sealed_key: sealed_id_key,
+                })
+            }
+            _ => None,
+        };
+        bincode::serialize_into(
+            &self.stream_to_enclave,
+            &SgxInitRequest::Start {
+                sealed_key,
+                config,
+                secret_connection,
+            },
+        )
+        .map_err(|_| ())?;
+
+        Ok(self.enclave_app_thread.join().map_err(|_| ())?)
     }
 }

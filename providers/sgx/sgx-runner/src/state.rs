@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tempfile::NamedTempFile;
-use tmkms_light::chain::state::{consensus, State, StateError, StateErrorKind};
+use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
 use tracing::{debug, warn};
 
 pub struct StateSyncer {

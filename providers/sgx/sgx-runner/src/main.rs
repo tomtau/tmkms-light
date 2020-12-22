@@ -6,7 +6,9 @@ use runner::TmkmsSgxSigner;
 use std::{fmt::Debug, os::unix::net::UnixStream, str::FromStr};
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
-use tracing::{debug, info, warn, Level};
+use tendermint::net;
+use tmkms_light::config::validator::ValidatorConfig;
+use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[derive(Debug)]
@@ -40,6 +42,8 @@ enum TmkmsLight {
         config_path: Option<PathBuf>,
         #[structopt(short)]
         pubkey_display: Option<PubkeyDisplay>,
+        #[structopt(short)]
+        bech32_prefix: Option<String>,
     },
     #[structopt(name = "start", about = "start tmkms process")]
     /// start tmkms process
@@ -55,6 +59,7 @@ fn main() {
         TmkmsLight::Init {
             config_path,
             pubkey_display,
+            bech32_prefix,
         } => {
             let cp = config_path.unwrap_or("tmkms.toml".into());
             let config = config::SgxSignOpt::default();
@@ -78,6 +83,33 @@ fn main() {
             let sealed_key = runner.keygen().expect("gen key");
             config::write_sealed_file(config.sealed_consensus_key_path, &sealed_key)
                 .expect("write key");
+            match pubkey_display {
+                Some(PubkeyDisplay::Bech32) => {
+                    let prefix = bech32_prefix.unwrap_or("cosmosvalconspub".to_owned());
+                    let mut data = vec![0x16, 0x24, 0xDE, 0x64, 0x20];
+                    data.extend_from_slice(&sealed_key.seal_key_request.keyid);
+                    println!(
+                        "public key: {}",
+                        subtle_encoding::bech32::encode(prefix, data)
+                    );
+                }
+                _ => {
+                    println!(
+                        "public key: {}",
+                        String::from_utf8(subtle_encoding::base64::encode(
+                            sealed_key.seal_key_request.keyid
+                        ))
+                        .unwrap()
+                    );
+                    let id = tendermint::node::Id::from(
+                        tendermint::public_key::Ed25519::from_bytes(
+                            &sealed_key.seal_key_request.keyid,
+                        )
+                        .expect("tm pubkey"),
+                    );
+                    println!("address: {}", id);
+                }
+            }
             if let Some(id_path) = config.sealed_id_key_path {
                 let runner = TmkmsSgxSigner::launch_enclave_app(
                     &config.enclave_path,
@@ -104,7 +136,39 @@ fn main() {
                 let toml_string = fs::read_to_string(cp).expect("toml config file read");
                 let config: config::SgxSignOpt =
                     toml::from_str(&toml_string).expect("configuration");
-                todo!()
+                let tm_conn = match &config.address {
+                    net::Address::Unix { path } => {
+                        debug!(
+                            "{}: Connecting to socket at {}...",
+                            &config.chain_id, &config.address
+                        );
+
+                        let socket = UnixStream::connect(path).expect("unix socket open");
+                        Some(socket)
+                    }
+                    _ => None,
+                };
+                let remote = if let (None, Some(path)) = (&tm_conn, config.sealed_id_key_path) {
+                    Some((config.address, path))
+                } else {
+                    None
+                };
+                let runner = TmkmsSgxSigner::launch_enclave_app(
+                    &config.enclave_path,
+                    tm_conn,
+                    &config.state_file_path,
+                )
+                .expect("runner");
+                runner
+                    .start(
+                        config.sealed_consensus_key_path,
+                        ValidatorConfig {
+                            chain_id: config.chain_id,
+                            max_height: config.max_height,
+                        },
+                        remote,
+                    )
+                    .expect("request loop");
             }
         }
     }

@@ -2,7 +2,7 @@ use crate::shared::SealedKeyData;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
 use std::{
-    fs::{self, OpenOptions},
+    fs::OpenOptions,
     io::{self, Write},
     os::unix::fs::OpenOptionsExt,
     path::Path,
