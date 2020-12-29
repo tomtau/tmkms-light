@@ -2,7 +2,7 @@ mod config;
 mod key_utils;
 mod state;
 use state::StateHolder;
-use std::{fmt::Debug, os::unix::net::UnixStream, str::FromStr};
+use std::{fmt::Debug, os::unix::net::UnixStream};
 use std::{fs, path::PathBuf};
 use std::{net::TcpStream, time::Duration};
 use structopt::StructOpt;
@@ -10,27 +10,13 @@ use subtle::ConstantTimeEq;
 use tendermint::net;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
 use tmkms_light::connection::{Connection, PlainConnection};
-use tmkms_light::{chain::state::PersistStateSync, config::validator::ValidatorConfig};
+use tmkms_light::{
+    chain::state::PersistStateSync,
+    config::validator::ValidatorConfig,
+    utils::{print_pubkey, PubkeyDisplay},
+};
 use tracing::{debug, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
-
-#[derive(Debug)]
-enum PubkeyDisplay {
-    Base64,
-    Bech32,
-}
-
-impl FromStr for PubkeyDisplay {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "base64" => Ok(PubkeyDisplay::Base64),
-            "bech32" => Ok(PubkeyDisplay::Bech32),
-            _ => Err("unknown display type".to_owned()),
-        }
-    }
-}
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -216,26 +202,7 @@ fn main() {
                     toml::from_str(&toml_string).expect("configuration");
                 let keypair = key_utils::load_base64_ed25519_key(config.consensus_key_path)
                     .expect("secret keypair");
-                match ptype {
-                    Some(PubkeyDisplay::Bech32) => {
-                        let prefix = bech32_prefix.unwrap_or("cosmosvalconspub".to_owned());
-                        let mut data = vec![0x16, 0x24, 0xDE, 0x64, 0x20];
-                        data.extend_from_slice(keypair.public.as_bytes());
-                        println!(
-                            "public key: {}",
-                            subtle_encoding::bech32::encode(prefix, data)
-                        );
-                    }
-                    _ => {
-                        println!(
-                            "public key: {}",
-                            String::from_utf8(subtle_encoding::base64::encode(keypair.public))
-                                .unwrap()
-                        );
-                        let id = tendermint::node::Id::from(keypair.public);
-                        println!("address: {}", id);
-                    }
-                }
+                print_pubkey(bech32_prefix, ptype, keypair.public);
             }
         }
     }

@@ -18,6 +18,7 @@ zeroize = "1"
 anomaly = "0.2"
 aesm-client = { version = "0.5", features = ["sgxs"] }
 bincode = "1"
+ed25519-dalek = "1"
 enclave-runner = "0.4"
 serde_json = "1"
 sgxs-loaders = "0.3"

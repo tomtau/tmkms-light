@@ -3,31 +3,16 @@ mod runner;
 mod shared;
 mod state;
 use runner::TmkmsSgxSigner;
-use std::{fmt::Debug, os::unix::net::UnixStream, str::FromStr};
+use std::{fmt::Debug, os::unix::net::UnixStream};
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 use tendermint::net;
-use tmkms_light::config::validator::ValidatorConfig;
+use tmkms_light::{
+    config::validator::ValidatorConfig,
+    utils::{print_pubkey, PubkeyDisplay},
+};
 use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
-
-#[derive(Debug)]
-enum PubkeyDisplay {
-    Base64,
-    Bech32,
-}
-
-impl FromStr for PubkeyDisplay {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "base64" => Ok(PubkeyDisplay::Base64),
-            "bech32" => Ok(PubkeyDisplay::Bech32),
-            _ => Err("unknown display type".to_owned()),
-        }
-    }
-}
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -83,33 +68,10 @@ fn main() {
             let sealed_key = runner.keygen().expect("gen key");
             config::write_sealed_file(config.sealed_consensus_key_path, &sealed_key)
                 .expect("write key");
-            match pubkey_display {
-                Some(PubkeyDisplay::Bech32) => {
-                    let prefix = bech32_prefix.unwrap_or("cosmosvalconspub".to_owned());
-                    let mut data = vec![0x16, 0x24, 0xDE, 0x64, 0x20];
-                    data.extend_from_slice(&sealed_key.seal_key_request.keyid);
-                    println!(
-                        "public key: {}",
-                        subtle_encoding::bech32::encode(prefix, data)
-                    );
-                }
-                _ => {
-                    println!(
-                        "public key: {}",
-                        String::from_utf8(subtle_encoding::base64::encode(
-                            sealed_key.seal_key_request.keyid
-                        ))
-                        .unwrap()
-                    );
-                    let id = tendermint::node::Id::from(
-                        tendermint::public_key::Ed25519::from_bytes(
-                            &sealed_key.seal_key_request.keyid,
-                        )
-                        .expect("tm pubkey"),
-                    );
-                    println!("address: {}", id);
-                }
-            }
+            let public_key =
+                ed25519_dalek::PublicKey::from_bytes(&sealed_key.seal_key_request.keyid)
+                    .expect("valid public key");
+            print_pubkey(bech32_prefix, pubkey_display, public_key);
             if let Some(id_path) = config.sealed_id_key_path {
                 let runner = TmkmsSgxSigner::launch_enclave_app(
                     &config.enclave_path,

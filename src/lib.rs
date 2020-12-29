@@ -4,3 +4,4 @@ pub mod connection;
 pub mod error;
 mod rpc;
 pub mod session;
+pub mod utils;
