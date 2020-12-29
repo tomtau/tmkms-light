@@ -13,7 +13,7 @@ aes-gcm-siv = "0.9"
 subtle = "2"
 sgx-isa = { version = "0.3", features = ["sgxstd"] }
 zeroize = "1"
-tendermint-p2p = { version = "=0.17.0-rc3" }
+tendermint-p2p = { version = "0.17" }
 
 tmkms-light-sgx-runner = { path = "../sgx-runner" }
 tmkms-light = { path = "../../.." }
