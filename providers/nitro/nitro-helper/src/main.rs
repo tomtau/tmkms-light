@@ -1,6 +1,7 @@
 mod config;
 mod key_utils;
 mod proxy;
+mod shared;
 mod state;
 
 use std::{fmt::Debug, os::unix::net::UnixStream};

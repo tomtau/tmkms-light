@@ -160,6 +160,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
+name = "aws-ne-sys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a57973cbd07397d42b7a4ad6f9e808b54bbbed4a75684e20b8f3255b9fcd2f59"
+
+[[package]]
 name = "backtrace"
 version = "0.3.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2353,12 +2359,20 @@ dependencies = [
 name = "tmkms-nitro-enclave"
 version = "0.1.0"
 dependencies = [
- "ed25519",
- "secrecy",
- "serde",
+ "anomaly",
+ "aws-ne-sys",
+ "bincode",
+ "ed25519-dalek",
+ "nix 0.17.0",
+ "rand",
+ "subtle",
  "tendermint",
- "thiserror",
+ "tendermint-p2p",
  "tmkms-light",
+ "tmkms-nitro-helper",
+ "tracing",
+ "tracing-subscriber",
+ "vsock",
  "zeroize",
 ]
 

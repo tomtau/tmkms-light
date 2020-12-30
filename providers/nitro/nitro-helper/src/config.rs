@@ -1,3 +1,4 @@
+use crate::shared::AwsCredentials;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
 use std::{
@@ -29,24 +30,12 @@ pub struct NitroSignOpt {
     pub enclave_config_port: u32,
     /// Vsock port to listen on for state synchronization
     pub enclave_state_port: u32,
-    /// Vsock port to forward privval plain traffic to TM over UDS
-    pub enclave_tendermint_conn: Option<u32>,
+    /// Vsock port to forward privval plain traffic to TM over UDS (or just pass to enclave if TCP/secret connection)
+    pub enclave_tendermint_conn: u32,
     /// AWS credentials -- if not set, they'll be obtained from IAM
     pub credentials: Option<AwsCredentials>,
     /// AWS region
     pub aws_region: String,
-}
-
-/// Credentials, generally obtained from parent instance IAM
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AwsCredentials {
-    /// AccessKeyId
-    pub aws_key_id: String,
-    /// SecretAccessKey
-    pub aws_secret_key: String,
-    /// SessionToken
-    pub aws_session_token: String,
 }
 
 impl Default for NitroSignOpt {
@@ -63,22 +52,9 @@ impl Default for NitroSignOpt {
             enclave_config_cid: 15,
             enclave_config_port: 5050,
             enclave_state_port: 5555,
-            enclave_tendermint_conn: None,
+            enclave_tendermint_conn: 5000,
             credentials: None,
             aws_region: "ap-southeast-1".to_owned(),
         }
     }
 }
-
-// write sealed key data
-// pub fn write_sealed_file<P: AsRef<Path>>(path: P, sealed_data: &SealedKeyData) -> io::Result<()> {
-//     OpenOptions::new()
-//         .create(true)
-//         .write(true)
-//         .truncate(true)
-//         .mode(0o600)
-//         .open(path.as_ref())
-//         .and_then(|mut file| {
-//             file.write_all(&bincode::serialize(sealed_data).expect("serialize sealed data"))
-//         })
-// }

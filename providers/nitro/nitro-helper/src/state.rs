@@ -12,7 +12,7 @@ use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
 use tracing::{debug, info, warn};
 use vsock::{VsockListener, VsockStream};
 
-use crate::proxy::VSOCK_PROXY_CID;
+use crate::shared::VSOCK_PROXY_CID;
 
 pub struct StateSyncer {
     state_file_path: PathBuf,
@@ -79,16 +79,6 @@ impl StateSyncer {
 
     /// Launches the state syncer
     pub fn launch_syncer(mut self) {
-        /*
-                bincode::serialize_into(&mut stream_to_enclave, &state).map_err(|e| {
-                    format_err!(
-                        StateErrorKind::SyncError,
-                        "error serializing to bincode {}",
-                        e
-                    )
-                })?;
-        */
-
         thread::spawn(move || {
             info!("listening for enclave persistence");
             for conn in self.vsock_listener.incoming() {

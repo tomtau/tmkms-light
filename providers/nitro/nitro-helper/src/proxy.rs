@@ -1,3 +1,4 @@
+use crate::shared::VSOCK_PROXY_CID;
 use nix::sys::select::{select, FdSet};
 use nix::sys::socket::SockAddr;
 use std::io::Read;
@@ -13,9 +14,6 @@ pub struct Proxy {
     local_port: u32,
     remote_addr: PathBuf,
 }
-
-/// CID for listening on the host
-pub const VSOCK_PROXY_CID: u32 = 3;
 
 impl Proxy {
     /// creates a new vsock<->uds proxy
