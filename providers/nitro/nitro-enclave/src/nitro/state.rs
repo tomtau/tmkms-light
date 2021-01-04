@@ -1,17 +1,20 @@
 use anomaly::format_err;
+use nix::sys::socket::SockAddr;
 use std::{io, net::TcpStream};
 use tmkms_light::chain::state::{consensus, PersistStateSync, State, StateError, StateErrorKind};
+use tmkms_nitro_helper::VSOCK_PROXY_CID;
 use tracing::debug;
+use vsock::VsockStream;
 
 pub struct StateHolder {
-    state_conn: TcpStream,
+    state_conn: VsockStream,
 }
 
 impl StateHolder {
-    pub fn new() -> io::Result<Self> {
-        Ok(Self {
-            state_conn: TcpStream::connect("state")?,
-        })
+    pub fn new(vsock_port: u32) -> io::Result<Self> {
+        let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
+        let state_conn = vsock::VsockStream::connect(&addr)?;
+        Ok(Self { state_conn })
     }
 }
 

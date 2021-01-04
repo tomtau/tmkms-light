@@ -2,10 +2,12 @@
 mod state;
 
 use ed25519_dalek::Keypair;
+use nix::sys::socket::SockAddr;
 use rand::rngs::OsRng;
 use std::io;
 use std::net::TcpStream;
 use subtle::ConstantTimeEq;
+use tendermint::node::Id;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
 use tmkms_light::chain::state::PersistStateSync;
 use tmkms_light::connection::{Connection, PlainConnection};
@@ -16,11 +18,11 @@ use zeroize::Zeroizing;
 
 fn get_secret_connection(
     vsock_port: u32,
-    identity_key: ed25519_dalek::SecretKey,
+    identity_key: ed25519_dalek::Keypair,
     peer_id: Option<Id>,
 ) -> io::Result<Box<dyn Connection>> {
-    let addr = vsock::SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
-    let mut socket = vsock::VsockStream::connect(&addr)?;
+    let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
+    let socket = vsock::VsockStream::connect(&addr)?;
     info!("KMS node ID: {}", PublicKey::from(&identity_key));
 
     let connection =
@@ -36,8 +38,8 @@ fn get_secret_connection(
     if let Some(expected_peer_id) = peer_id {
         if expected_peer_id.ct_eq(&actual_peer_id).unwrap_u8() == 0 {
             error!(
-                "{}:{}: validator peer ID mismatch! (expected {}, got {})",
-                host, port, expected_peer_id, actual_peer_id
+                "(vsock port {}): validator peer ID mismatch! (expected {}, got {})",
+                vsock_port, expected_peer_id, actual_peer_id
             );
             return Err(io::Error::from(io::ErrorKind::Other));
         }
@@ -75,5 +77,5 @@ pub fn entry(mut config_stream: VsockStream) {
         }
     }
 
-    Ok(())
+    // Ok(())
 }
