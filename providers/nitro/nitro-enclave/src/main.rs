@@ -27,9 +27,11 @@ fn main() {
     info!("waiting for config to be pushed on {}", addr);
     for conn in listener.incoming() {
         match conn {
-            Ok(mut stream) => {
+            Ok(stream) => {
                 info!("got connection on {:?}", addr);
-                nitro::entry(stream)
+                if let Err(e) = nitro::entry(stream) {
+                    error!("io error {}", e);
+                }
             }
             Err(e) => {
                 warn!("connection error {}", e);

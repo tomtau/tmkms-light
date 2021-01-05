@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use tendermint::{chain, net};
+use tendermint::{chain, node};
 
 /// CID for listening on the host
 pub const VSOCK_PROXY_CID: u32 = 3;
@@ -7,8 +7,6 @@ pub const VSOCK_PROXY_CID: u32 = 3;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NitroConfig {
-    /// Address of the validator (`tcp://` or `unix://`)
-    pub address: net::Address,
     /// Chain ID of the Tendermint network this validator is part of
     pub chain_id: chain::Id,
     /// Height at which to stop signing
@@ -17,6 +15,8 @@ pub struct NitroConfig {
     pub sealed_consensus_key: Vec<u8>,
     /// AWS KMS-encrypted Ed25519 identity key (if secret connection)
     pub sealed_id_key: Option<Vec<u8>>,
+    /// peer id to check with secret connections
+    pub peer_id: Option<node::Id>,
     /// Vsock port to push config to
     pub enclave_config_port: u32,
     /// Vsock port to listen on for state synchronization

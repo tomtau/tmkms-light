@@ -9,13 +9,12 @@ anomaly = "0.2"
 aws-ne-sys = "0.2"
 bincode = "1"
 ed25519-dalek = "1"
-rand = "0.7"
 nix = "0.17"
 subtle = "2"
 tendermint = { version = "0.17" }
 tendermint-p2p = { version = "0.17" }
 tmkms-light = { path = "../../.." }
-tmkms-nitro-helper = { path = "../nitro-helper" }
+tmkms-nitro-helper = { path = "../nitro-helper", default-features = false }
 tracing = "0.1"
 tracing-subscriber = "0.2"
 vsock = "0.2"

@@ -2364,7 +2364,6 @@ dependencies = [
  "bincode",
  "ed25519-dalek",
  "nix 0.17.0",
- "rand",
  "subtle",
  "tendermint",
  "tendermint-p2p",

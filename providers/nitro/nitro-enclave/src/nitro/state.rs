@@ -1,6 +1,6 @@
 use anomaly::format_err;
 use nix::sys::socket::SockAddr;
-use std::{io, net::TcpStream};
+use std::io;
 use tmkms_light::chain::state::{consensus, PersistStateSync, State, StateError, StateErrorKind};
 use tmkms_nitro_helper::VSOCK_PROXY_CID;
 use tracing::debug;
