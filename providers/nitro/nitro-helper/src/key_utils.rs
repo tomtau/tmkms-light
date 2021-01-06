@@ -53,5 +53,4 @@ pub fn generate_key(
         .and_then(|mut file| file.write_all(&*ciphertext))
         .map_err(|e| format!("couldn't write `{}`: {}", path.as_ref().display(), e))?;
     Ok(public)
-    //write_base64_secret(path, &*secret_key)
 }

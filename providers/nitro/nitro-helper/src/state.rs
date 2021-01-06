@@ -78,7 +78,7 @@ impl StateSyncer {
     }
 
     /// Launches the state syncer
-    pub fn launch_syncer(mut self) {
+    pub fn launch_syncer(mut self) -> thread::JoinHandle<()> {
         thread::spawn(move || {
             info!("listening for enclave persistence");
             for conn in self.vsock_listener.incoming() {
@@ -106,7 +106,7 @@ impl StateSyncer {
                     }
                 }
             }
-        });
+        })
     }
 
     fn persist_state(path: &PathBuf, new_state: &consensus::State) -> Result<(), StateError> {

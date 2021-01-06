@@ -17,8 +17,6 @@ pub struct NitroConfig {
     pub sealed_id_key: Option<Vec<u8>>,
     /// peer id to check with secret connections
     pub peer_id: Option<node::Id>,
-    /// Vsock port to push config to
-    pub enclave_config_port: u32,
     /// Vsock port to listen on for state synchronization
     pub enclave_state_port: u32,
     /// Vsock port to forward privval plain traffic to TM over UDS or TCP
@@ -30,7 +28,7 @@ pub struct NitroConfig {
 }
 
 /// Credentials, generally obtained from parent instance IAM
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AwsCredentials {
     /// AccessKeyId

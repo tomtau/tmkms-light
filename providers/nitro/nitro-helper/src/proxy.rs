@@ -6,7 +6,9 @@ use std::io::Write;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
-use tracing::info;
+use std::thread;
+use std::time::Duration;
+use tracing::{error, info};
 use vsock::VsockListener;
 
 /// Configuration parameters for port listening and remote destination
@@ -65,6 +67,24 @@ impl Proxy {
         }
         info!("Client on {:?} disconnected", client_addr);
         Ok(())
+    }
+
+    /// keep listening / re-connecting
+    pub fn launch_proxy(self) {
+        thread::spawn(move || loop {
+            match self.sock_listen() {
+                Ok(listener) => {
+                    if let Err(e) = self.sock_accept(&listener) {
+                        error!("connection failed {}", e);
+                        thread::sleep(Duration::new(1, 0));
+                    }
+                }
+                Err(e) => {
+                    error!("listening failed {}", e);
+                    thread::sleep(Duration::new(1, 0));
+                }
+            }
+        });
     }
 }
 
