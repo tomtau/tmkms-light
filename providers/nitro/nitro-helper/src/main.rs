@@ -150,15 +150,10 @@ fn main() {
                 let state_syncer =
                     StateSyncer::new(config.state_file_path, config.enclave_state_port)
                         .expect("state syncer");
-                let sealed_consensus_key = base64::decode(
-                    fs::read_to_string(config.sealed_consensus_key_path).expect("key bytes"),
-                )
-                .expect("key data");
+                let sealed_consensus_key =
+                    fs::read(config.sealed_consensus_key_path).expect("key bytes");
                 let sealed_id_key = if let Some(p) = config.sealed_id_key_path {
-                    Some(
-                        base64::decode(fs::read_to_string(p).expect("key bytes"))
-                            .expect("key data"),
-                    )
+                    Some(fs::read(p).expect("key bytes"))
                 } else {
                     None
                 };
