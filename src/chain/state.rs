@@ -4,6 +4,7 @@ use anomaly::fail;
 pub use tendermint::consensus;
 use tendermint::{proposal::SignProposalRequest, vote::SignVoteRequest};
 /// State tracking for double signing prevention
+#[derive(Debug, Clone)]
 pub struct State {
     consensus_state: consensus::State,
 }

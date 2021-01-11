@@ -6,6 +6,7 @@ use tmkms_nitro_helper::VSOCK_PROXY_CID;
 use tracing::debug;
 use vsock::VsockStream;
 
+#[derive(Debug, Clone)]
 pub struct StateHolder {
     state_conn: VsockStream,
 }
