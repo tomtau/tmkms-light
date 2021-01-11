@@ -12,10 +12,6 @@ fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    if aws_ne_sys::seed_entropy(512).is_err() {
-        error!("failed to seed initial entropy!");
-        std::process::exit(1);
-    }
     let port = std::env::args()
         .next()
         .map(|x| x.parse::<u32>().ok())
@@ -26,6 +22,10 @@ fn main() {
     let listener = VsockListener::bind(&addr).expect("bind address");
     info!("waiting for config to be pushed on {}", addr);
     for conn in listener.incoming() {
+        if aws_ne_sys::seed_entropy(512).is_err() {
+            error!("failed to seed initial entropy!");
+            std::process::exit(1);
+        }
         match conn {
             Ok(stream) => {
                 info!("got connection on {:?}", addr);
