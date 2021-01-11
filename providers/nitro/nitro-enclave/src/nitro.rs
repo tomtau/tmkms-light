@@ -83,50 +83,53 @@ pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
                     .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
                 let public = ed25519::PublicKey::from(&secret);
                 let keypair = ed25519::Keypair { secret, public };
-                let conn: Box<dyn Connection> = if let Some(ciphertext) = config.sealed_id_key {
-                    let id_key_bytes = Zeroizing::new(
-                        aws_ne_sys::kms_decrypt(
-                            config.aws_region.as_bytes(),
-                            config.credentials.aws_key_id.as_bytes(),
-                            config.credentials.aws_secret_key.as_bytes(),
-                            config.credentials.aws_session_token.as_bytes(),
-                            ciphertext.as_ref(),
+                loop {
+                    let conn: Box<dyn Connection> = if let Some(ciphertext) = config.sealed_id_key {
+                        let id_key_bytes = Zeroizing::new(
+                            aws_ne_sys::kms_decrypt(
+                                config.aws_region.as_bytes(),
+                                config.credentials.aws_key_id.as_bytes(),
+                                config.credentials.aws_secret_key.as_bytes(),
+                                config.credentials.aws_session_token.as_bytes(),
+                                ciphertext.as_ref(),
+                            )
+                            .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
+                        );
+                        let id_secret = ed25519::SecretKey::from_bytes(&*id_key_bytes)
+                            .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
+                        let id_public = ed25519::PublicKey::from(&id_secret);
+                        let id_keypair = ed25519::Keypair {
+                            secret: id_secret,
+                            public: id_public,
+                        };
+                        get_secret_connection(
+                            config.enclave_tendermint_conn,
+                            id_keypair,
+                            config.peer_id,
                         )
-                        .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
-                    );
-                    let id_secret = ed25519::SecretKey::from_bytes(&*id_key_bytes)
-                        .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
-                    let id_public = ed25519::PublicKey::from(&id_secret);
-                    let id_keypair = ed25519::Keypair {
-                        secret: id_secret,
-                        public: id_public,
+                        .map_err(|_e| format_err!(IoError, "failed get tendermint connection"))?
+                    } else {
+                        let addr =
+                            SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);
+                        let socket = vsock::VsockStream::connect(&addr)
+                            .map_err(|_e| format_err!(IoError, "failed get privval connection"))?;
+                        info!("connected to validator successfully");
+                        let plain_conn = PlainConnection::new(socket);
+                        Box::new(plain_conn)
                     };
-                    get_secret_connection(
-                        config.enclave_tendermint_conn,
-                        id_keypair,
-                        config.peer_id,
-                    )
-                    .map_err(|_e| format_err!(IoError, "failed get tendermint connection"))?
-                } else {
-                    let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);
-                    let socket = vsock::VsockStream::connect(&addr)
-                        .map_err(|_e| format_err!(IoError, "failed get privval connection"))?;
-                    info!("connected to validator successfully");
-                    let plain_conn = PlainConnection::new(socket);
-                    Box::new(plain_conn)
-                };
-                let mut session = tmkms_light::session::Session::new(
-                    ValidatorConfig {
-                        chain_id: config.chain_id,
-                        max_height: config.max_height,
-                    },
-                    conn,
-                    keypair,
-                    state,
-                    state_holder,
-                );
-                if let Err(e) = session.request_loop() {
-                    error!("request error: {}", e);
+                    let mut session = tmkms_light::session::Session::new(
+                        ValidatorConfig {
+                            chain_id: config.chain_id,
+                            max_height: config.max_height,
+                        },
+                        conn,
+                        keypair,
+                        state,
+                        state_holder,
+                    );
+                    if let Err(e) = session.request_loop() {
+                        error!("request error: {}", e);
+                    }
                 }
             }
         }

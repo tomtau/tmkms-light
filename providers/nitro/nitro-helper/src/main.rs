@@ -153,7 +153,11 @@ fn main() {
                 let sealed_consensus_key =
                     fs::read(config.sealed_consensus_key_path).expect("key bytes");
                 let sealed_id_key = if let Some(p) = config.sealed_id_key_path {
-                    Some(fs::read(p).expect("key bytes"))
+                    if let net::Address::Tcp { .. } = config.address {
+                        Some(fs::read(p).expect("key bytes"))
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 };
