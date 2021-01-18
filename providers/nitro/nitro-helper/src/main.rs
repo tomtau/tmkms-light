@@ -9,16 +9,12 @@ use proxy::Proxy;
 use rusoto_credential::{InstanceMetadataProvider, ProvideAwsCredentials};
 use shared::{AwsCredentials, NitroConfig};
 use state::StateSyncer;
-use std::{fmt::Debug, os::unix::net::UnixStream};
+use std::fmt::Debug;
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
-use subtle_encoding::base64;
 use sysinfo::{ProcessExt, SystemExt};
 use tendermint::net;
-use tmkms_light::{
-    config::validator::ValidatorConfig,
-    utils::{print_pubkey, PubkeyDisplay},
-};
+use tmkms_light::utils::{print_pubkey, PubkeyDisplay};
 use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -97,7 +93,7 @@ fn main() {
                 if system
                     .get_processes()
                     .iter()
-                    .find(|(pid, p)| p.name() == "vsock-proxy")
+                    .find(|(_pid, p)| p.name() == "vsock-proxy")
                     .is_none()
                 {
                     eprintln!("vsock-proxy not running");
@@ -147,9 +143,6 @@ fn main() {
                     net::Address::Tcp { peer_id, .. } => peer_id.clone(),
                     _ => None,
                 };
-                let state_syncer =
-                    StateSyncer::new(config.state_file_path, config.enclave_state_port)
-                        .expect("state syncer");
                 let sealed_consensus_key =
                     fs::read(config.sealed_consensus_key_path).expect("key bytes");
                 let sealed_id_key = if let Some(p) = config.sealed_id_key_path {
@@ -175,10 +168,16 @@ fn main() {
                 let addr =
                     SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port);
                 let mut socket = vsock::VsockStream::connect(&addr).expect("config stream");
-                bincode::serialize_into(&mut socket, &enclave_config);
+                bincode::serialize_into(&mut socket, &enclave_config).expect("write config");
                 if let Some(p) = proxy {
                     p.launch_proxy();
                 }
+                let state_syncer = StateSyncer::new(
+                    config.state_file_path,
+                    config.enclave_config_cid,
+                    config.enclave_state_port,
+                )
+                .expect("state syncer");
                 state_syncer.launch_syncer().join().expect("state syncing");
             }
         }

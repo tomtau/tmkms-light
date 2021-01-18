@@ -1,27 +1,29 @@
 use anomaly::{fail, format_err};
 use nix::sys::socket::SockAddr;
-use std::os::unix::net::UnixStream;
-use std::thread;
 use std::{
     fs,
     io::{self, prelude::*},
     path::{Path, PathBuf},
+    thread,
+    time::Duration,
 };
 use tempfile::NamedTempFile;
 use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
 use tracing::{debug, info, warn};
-use vsock::{VsockListener, VsockStream};
-
-use crate::shared::VSOCK_PROXY_CID;
+use vsock::VsockStream;
 
 pub struct StateSyncer {
     state_file_path: PathBuf,
-    vsock_listener: VsockListener,
+    vsock_conn: VsockStream,
     state: consensus::State,
 }
 
 impl StateSyncer {
-    pub fn new<P: AsRef<Path>>(path: P, vsock_port: u32) -> Result<Self, StateError> {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        vsock_cid: u32,
+        vsock_port: u32,
+    ) -> Result<Self, StateError> {
         let state_file_path = path.as_ref().to_owned();
         let state = match fs::read_to_string(&path) {
             Ok(state_json) => {
@@ -48,18 +50,34 @@ impl StateSyncer {
             ),
         }?;
 
-        let sockaddr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
-        let vsock_listener = VsockListener::bind(&sockaddr).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "failed to listen on vsock: {}",
-                e
-            )
-        })?;
-
+        let sockaddr = SockAddr::new_vsock(vsock_cid, vsock_port);
+        const MAX_ATTEMPTS: u64 = 5;
+        let mut vsock_conn = vsock::VsockStream::connect(&sockaddr);
+        let mut attempt = 1;
+        while let Err(e) = vsock_conn {
+            if attempt == MAX_ATTEMPTS {
+                return Err(format_err!(
+                    StateErrorKind::SyncError,
+                    "failed to connect to vsock: {}",
+                    e
+                )
+                .into());
+            }
+            warn!(
+                "failed to connect to the state persistence socket {}; retrying {}",
+                e, attempt
+            );
+            thread::sleep(Duration::new(attempt, 0));
+            attempt += 1;
+            vsock_conn = vsock::VsockStream::connect(&sockaddr);
+        }
+        let mut vsock_conn = vsock_conn.unwrap();
+        if let Err(e) = bincode::serialize_into(&mut vsock_conn, &state) {
+            warn!("error serializing to bincode {}", e);
+        }
         Ok(Self {
             state_file_path,
-            vsock_listener,
+            vsock_conn,
             state,
         })
     }
@@ -80,30 +98,16 @@ impl StateSyncer {
     /// Launches the state syncer
     pub fn launch_syncer(mut self) -> thread::JoinHandle<()> {
         thread::spawn(move || {
-            info!("listening for enclave persistence");
-            for conn in self.vsock_listener.incoming() {
-                match conn {
-                    Ok(mut stream) => {
-                        info!("vsock persistence connection established");
-                        if let Err(e) = bincode::serialize_into(&mut stream, &self.state) {
-                            warn!("error serializing to bincode {}", e);
-                        } else {
-                            loop {
-                                if let Ok(consensus_state) = bincode::deserialize_from(&mut stream)
-                                {
-                                    self.state = consensus_state;
-                                    if let Err(e) =
-                                        Self::persist_state(&self.state_file_path, &self.state)
-                                    {
-                                        warn!("state persistence failed: {}", e);
-                                    }
-                                }
-                            }
-                        }
+            info!("getting states from enclave for local persistence");
+            loop {
+                if let Ok(consensus_state) = bincode::deserialize_from(&mut self.vsock_conn) {
+                    self.state = consensus_state;
+                    if let Err(e) = Self::persist_state(&self.state_file_path, &self.state) {
+                        warn!("state persistence failed: {}", e);
                     }
-                    Err(e) => {
-                        warn!("Vsock connection failed: {}", e);
-                    }
+                } else {
+                    warn!("failed to deserialize state from vsock connection");
+                    thread::sleep(Duration::new(1, 0));
                 }
             }
         })
