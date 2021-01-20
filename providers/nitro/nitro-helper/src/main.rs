@@ -48,6 +48,12 @@ enum TmkmsLight {
         #[structopt(short)]
         config_path: Option<PathBuf>,
     },
+    #[structopt(name = "uds-proxy", about = "start the Unix domain socket proxy")]
+    /// start the Unix domain socket proxy
+    Proxy {
+        #[structopt(short)]
+        config_path: Option<PathBuf>,
+    },
 }
 
 fn main() {
@@ -84,6 +90,37 @@ fn main() {
             if let Some(id_path) = config.sealed_id_key_path {
                 key_utils::generate_key(id_path, &config.aws_region, kms_key_id)
                     .expect("generated id key");
+            }
+        }
+        TmkmsLight::Proxy { config_path } => {
+            let cp = config_path.unwrap_or("tmkms.toml".into());
+            if !cp.exists() {
+                eprintln!("missing tmkms.toml file");
+                std::process::exit(1);
+            } else {
+                let subscriber = FmtSubscriber::builder()
+                    .with_max_level(Level::INFO)
+                    .finish();
+
+                tracing::subscriber::set_global_default(subscriber)
+                    .expect("setting default subscriber failed");
+                let toml_string = fs::read_to_string(cp).expect("toml config file read");
+                let config: config::NitroSignOpt =
+                    toml::from_str(&toml_string).expect("configuration");
+                let proxy = match &config.address {
+                    net::Address::Unix { path } => {
+                        debug!(
+                            "{}: Creating a proxy {}...",
+                            &config.chain_id, &config.address
+                        );
+
+                        Some(Proxy::new(config.enclave_tendermint_conn, path.clone()))
+                    }
+                    _ => None,
+                };
+                if let Some(p) = proxy {
+                    p.launch_proxy();
+                }
             }
         }
         TmkmsLight::Start { config_path } => {
@@ -132,17 +169,6 @@ fn main() {
                             .to_owned(),
                     }
                 };
-                let proxy = match &config.address {
-                    net::Address::Unix { path } => {
-                        debug!(
-                            "{}: Creating a proxy {}...",
-                            &config.chain_id, &config.address
-                        );
-
-                        Some(Proxy::new(config.enclave_tendermint_conn, path.clone()))
-                    }
-                    _ => None,
-                };
                 let peer_id = match &config.address {
                     net::Address::Tcp { peer_id, .. } => peer_id.clone(),
                     _ => None,
@@ -176,9 +202,7 @@ fn main() {
                     SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port);
                 let mut socket = vsock::VsockStream::connect(&addr).expect("config stream");
                 bincode::serialize_into(&mut socket, &enclave_config);
-                if let Some(p) = proxy {
-                    p.launch_proxy();
-                }
+
                 state_syncer.launch_syncer().join().expect("state syncing");
             }
         }

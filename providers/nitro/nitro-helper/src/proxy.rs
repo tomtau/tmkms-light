@@ -71,7 +71,7 @@ impl Proxy {
 
     /// keep listening / re-connecting
     pub fn launch_proxy(self) {
-        thread::spawn(move || loop {
+        loop {
             match self.sock_listen() {
                 Ok(listener) => {
                     if let Err(e) = self.sock_accept(&listener) {
@@ -84,7 +84,7 @@ impl Proxy {
                     thread::sleep(Duration::new(1, 0));
                 }
             }
-        });
+        }
     }
 }
 
