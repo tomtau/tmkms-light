@@ -8,7 +8,7 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::{error, info, trace};
 use vsock::VsockListener;
 
 /// Configuration parameters for port listening and remote destination
@@ -58,9 +58,11 @@ impl Proxy {
 
             select(None, Some(&mut set), None, None, None).expect("select");
 
+            trace!("client -> server");
             if set.contains(client_socket) {
                 disconnected = transfer(&mut client, &mut server);
             }
+            trace!("server -> client");
             if set.contains(server_socket) {
                 disconnected = transfer(&mut server, &mut client);
             }
@@ -104,6 +106,6 @@ fn transfer(src: &mut dyn Read, dst: &mut dyn Write) -> bool {
     if nbytes == 0 {
         return true;
     }
-
+    trace!("transfer data: {:02X?}", &buffer[..nbytes]);
     dst.write_all(&buffer[..nbytes]).is_err()
 }

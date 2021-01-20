@@ -2,8 +2,8 @@
 
 use std::io;
 use std::marker::{Send, Sync};
-
 use tendermint_p2p::secret_connection::SecretConnection;
+use tracing::{debug, trace};
 
 /// Connections to a validator
 pub trait Connection: io::Read + io::Write + Sync + Send {}
@@ -28,7 +28,10 @@ where
     IoHandler: io::Read + io::Write + Send + Sync,
 {
     fn read(&mut self, data: &mut [u8]) -> Result<usize, io::Error> {
-        self.socket.read(data)
+        let r = self.socket.read(data);
+        debug!("read tm connection: {:?}", r);
+        trace!("read data: {:02X?}", data);
+        r
     }
 }
 
@@ -37,10 +40,14 @@ where
     IoHandler: io::Read + io::Write + Send + Sync,
 {
     fn write(&mut self, data: &[u8]) -> Result<usize, io::Error> {
-        self.socket.write(data)
+        let r = self.socket.write(data);
+        debug!("write tm connection: {:?}", r);
+        trace!("written: {:02X?}", data);
+        r
     }
 
     fn flush(&mut self) -> Result<(), io::Error> {
+        trace!("flush");
         self.socket.flush()
     }
 }

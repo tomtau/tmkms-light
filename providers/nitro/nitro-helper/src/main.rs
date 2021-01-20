@@ -99,7 +99,7 @@ fn main() {
                 std::process::exit(1);
             } else {
                 let subscriber = FmtSubscriber::builder()
-                    .with_max_level(Level::INFO)
+                    .with_max_level(Level::TRACE)
                     .finish();
 
                 tracing::subscriber::set_global_default(subscriber)

@@ -7,7 +7,7 @@ use vsock::VsockListener;
 fn main() {
     // TODO: subscriber for production to forward to vsock
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+        .with_max_level(Level::TRACE)
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
