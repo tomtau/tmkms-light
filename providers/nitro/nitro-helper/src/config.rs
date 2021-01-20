@@ -1,6 +1,12 @@
 use crate::shared::AwsCredentials;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    io::{self, Write},
+    os::unix::fs::OpenOptionsExt,
+    path::Path,
+};
 use tendermint::{chain, net};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,7 +28,7 @@ pub struct NitroSignOpt {
     pub enclave_config_cid: u32,
     /// Vsock port to push config to
     pub enclave_config_port: u32,
-    /// Vsock port to connect to for state synchronization
+    /// Vsock port to listen on for state synchronization
     pub enclave_state_port: u32,
     /// Vsock port to forward privval plain traffic to TM over UDS (or just pass to enclave if TCP/secret connection)
     pub enclave_tendermint_conn: u32,

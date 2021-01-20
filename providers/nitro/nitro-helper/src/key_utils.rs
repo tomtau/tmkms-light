@@ -5,7 +5,12 @@ use rusoto_core::{region::Region, HttpClient};
 use rusoto_credential::InstanceMetadataProvider;
 use rusoto_kms::{EncryptRequest, Kms, KmsClient};
 use std::str::FromStr;
-use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+    os::unix::fs::OpenOptionsExt,
+    path::Path,
+};
 
 /// Generates key and encrypts with AWS KMS at the given path
 pub fn generate_key(

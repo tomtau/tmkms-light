@@ -17,7 +17,8 @@ fn main() {
         .map(|x| x.parse::<u32>().ok())
         .flatten()
         .unwrap_or(5050);
-    let addr = SockAddr::new_vsock(nitro::VMADDR_CID_ANY, port);
+    const VMADDR_CID_ANY: u32 = 0xFFFFFFFF;
+    let addr = SockAddr::new_vsock(VMADDR_CID_ANY, port);
     let listener = VsockListener::bind(&addr).expect("bind address");
     info!("waiting for config to be pushed on {}", addr);
     for conn in listener.incoming() {

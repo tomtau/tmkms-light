@@ -20,9 +20,6 @@ use tracing::{error, info, warn};
 use vsock::VsockStream;
 use zeroize::Zeroizing;
 
-/// CID for enclave listening
-pub const VMADDR_CID_ANY: u32 = 0xFFFFFFFF;
-
 fn get_secret_connection(
     vsock_port: u32,
     identity_key: ed25519::Keypair,

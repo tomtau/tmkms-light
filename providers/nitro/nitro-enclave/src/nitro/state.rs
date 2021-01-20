@@ -1,10 +1,10 @@
-use crate::nitro::VMADDR_CID_ANY;
 use anomaly::format_err;
 use nix::sys::socket::SockAddr;
 use std::io;
 use tmkms_light::chain::state::{consensus, PersistStateSync, State, StateError, StateErrorKind};
-use tracing::{debug, info, warn};
-use vsock::{VsockListener, VsockStream};
+use tmkms_nitro_helper::VSOCK_PROXY_CID;
+use tracing::debug;
+use vsock::VsockStream;
 
 #[derive(Debug, Clone)]
 pub struct StateHolder {
@@ -13,17 +13,9 @@ pub struct StateHolder {
 
 impl StateHolder {
     pub fn new(vsock_port: u32) -> io::Result<Self> {
-        let addr = SockAddr::new_vsock(VMADDR_CID_ANY, vsock_port);
-        let listener = VsockListener::bind(&addr)?;
-        info!("waiting for state connection {}", addr);
-        let mut state_conn = listener.accept();
-        while let Err(e) = state_conn {
-            warn!("error getting state connection: {}", e);
-            state_conn = listener.accept();
-        }
-        Ok(Self {
-            state_conn: state_conn?.0,
-        })
+        let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
+        let state_conn = vsock::VsockStream::connect(&addr)?;
+        Ok(Self { state_conn })
     }
 }
 
