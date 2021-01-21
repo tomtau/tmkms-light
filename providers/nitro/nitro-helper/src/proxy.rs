@@ -8,7 +8,7 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-use tracing::{error, info, trace};
+use tracing::{debug, error, info, trace};
 use vsock::VsockListener;
 
 /// Configuration parameters for port listening and remote destination
@@ -29,6 +29,7 @@ impl Proxy {
     /// Creates a listening socket
     /// Returns the file descriptor for it or the appropriate error
     pub fn sock_listen(&self) -> Result<VsockListener, String> {
+        info!("binding proxy to vsock port: {}", self.local_port);
         let sockaddr = SockAddr::new_vsock(VSOCK_PROXY_CID, self.local_port);
         let listener = VsockListener::bind(&sockaddr)
             .map_err(|_| format!("Could not bind to {:?}", sockaddr))?;
@@ -55,7 +56,10 @@ impl Proxy {
             let mut set = FdSet::new();
             set.insert(client_socket);
             set.insert(server_socket);
-
+            trace!("proxy peer addr: {:?}", client.peer_addr());
+            trace!("proxy local addr: {:?}", client.local_addr());
+            trace!("proxy fd: {} {}", client.as_raw_fd(), client_socket);
+            trace!("proxy uds/server fd: {}", server_socket);
             select(None, Some(&mut set), None, None, None).expect("select");
 
             trace!("client -> server");
@@ -73,7 +77,7 @@ impl Proxy {
 
     /// keep listening / re-connecting
     pub fn launch_proxy(self) {
-        loop {
+        thread::spawn(move || loop {
             match self.sock_listen() {
                 Ok(listener) => {
                     if let Err(e) = self.sock_accept(&listener) {
@@ -86,7 +90,7 @@ impl Proxy {
                     thread::sleep(Duration::new(1, 0));
                 }
             }
-        }
+        });
     }
 }
 

@@ -1,5 +1,7 @@
+use crate::shared::VSOCK_PROXY_CID;
 use anomaly::{fail, format_err};
 use nix::sys::socket::SockAddr;
+use std::os::unix::io::AsRawFd;
 use std::os::unix::net::UnixStream;
 use std::thread;
 use std::{
@@ -11,8 +13,6 @@ use tempfile::NamedTempFile;
 use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
 use tracing::{debug, info, warn};
 use vsock::{VsockListener, VsockStream};
-
-use crate::shared::VSOCK_PROXY_CID;
 
 pub struct StateSyncer {
     state_file_path: PathBuf,
@@ -85,6 +85,9 @@ impl StateSyncer {
                 match conn {
                     Ok(mut stream) => {
                         info!("vsock persistence connection established");
+                        debug!("state peer addr: {:?}", stream.peer_addr());
+                        debug!("state local addr: {:?}", stream.local_addr());
+                        debug!("state fd: {}", stream.as_raw_fd());
                         if let Err(e) = bincode::serialize_into(&mut stream, &self.state) {
                             warn!("error serializing to bincode {}", e);
                         } else {

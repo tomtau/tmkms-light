@@ -5,6 +5,7 @@ use anomaly::format_err;
 use ed25519_dalek as ed25519;
 use nix::sys::socket::SockAddr;
 use std::io;
+use std::os::unix::io::AsRawFd;
 use subtle::ConstantTimeEq;
 use tendermint::node::Id;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
@@ -16,7 +17,7 @@ use tmkms_light::error::{
     ErrorKind::{AccessError, InvalidKey, IoError},
 };
 use tmkms_nitro_helper::{NitroConfig, VSOCK_PROXY_CID};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use vsock::VsockStream;
 use zeroize::Zeroizing;
 
@@ -66,20 +67,20 @@ pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
     let mconfig: bincode::Result<NitroConfig> = bincode::deserialize_from(&mut config_stream);
     match mconfig {
         Ok(config) => {
-            let mut state_holder = state::StateHolder::new(config.enclave_state_port)
-                .map_err(|_e| format_err!(IoError, "failed get state connection"))?;
-            if let Ok(state) = state_holder.load_state() {
-                let key_bytes = Zeroizing::new(
-                    aws_ne_sys::kms_decrypt(
-                        config.aws_region.as_bytes(),
-                        config.credentials.aws_key_id.as_bytes(),
-                        config.credentials.aws_secret_key.as_bytes(),
-                        config.credentials.aws_session_token.as_bytes(),
-                        config.sealed_consensus_key.as_ref(),
-                    )
-                    .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
-                );
-                loop {
+            let key_bytes = Zeroizing::new(
+                aws_ne_sys::kms_decrypt(
+                    config.aws_region.as_bytes(),
+                    config.credentials.aws_key_id.as_bytes(),
+                    config.credentials.aws_secret_key.as_bytes(),
+                    config.credentials.aws_session_token.as_bytes(),
+                    config.sealed_consensus_key.as_ref(),
+                )
+                .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
+            );
+            loop {
+                let mut state_holder = state::StateHolder::new(config.enclave_state_port)
+                    .map_err(|_e| format_err!(IoError, "failed get state connection"))?;
+                if let Ok(state) = state_holder.load_state() {
                     let secret = ed25519::SecretKey::from_bytes(&*key_bytes)
                         .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
                     let public = ed25519::PublicKey::from(&secret);
@@ -116,6 +117,10 @@ pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
                             SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);
                         let socket = vsock::VsockStream::connect(&addr)
                             .map_err(|_e| format_err!(IoError, "failed get privval connection"))?;
+                        debug!("tendermint vsock port: {}", config.enclave_tendermint_conn);
+                        debug!("tendermint peer addr: {:?}", socket.peer_addr());
+                        debug!("tendermint local addr: {:?}", socket.local_addr());
+                        debug!("tendermint fd: {}", socket.as_raw_fd());
                         info!("connected to validator successfully");
                         let plain_conn = PlainConnection::new(socket);
                         Box::new(plain_conn)
@@ -127,8 +132,8 @@ pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
                         },
                         conn,
                         keypair,
-                        state.clone(),
-                        state_holder.clone(),
+                        state,
+                        state_holder,
                     );
                     if let Err(e) = session.request_loop() {
                         error!("request error: {}", e);
