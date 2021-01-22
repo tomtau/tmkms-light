@@ -2,7 +2,6 @@ use crate::shared::VSOCK_PROXY_CID;
 use anomaly::{fail, format_err};
 use nix::sys::socket::SockAddr;
 use std::os::unix::io::AsRawFd;
-use std::os::unix::net::UnixStream;
 use std::thread;
 use std::{
     fs,

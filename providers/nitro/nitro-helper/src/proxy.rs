@@ -8,7 +8,7 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-use tracing::{debug, error, info, trace};
+use tracing::{error, info, trace};
 use vsock::VsockListener;
 
 /// Configuration parameters for port listening and remote destination
