@@ -16,6 +16,7 @@ use tmkms_light::error::{
     Error,
     ErrorKind::{AccessError, InvalidKey, IoError},
 };
+use tmkms_light::utils::read_u16_payload;
 use tmkms_nitro_helper::{NitroConfig, VSOCK_PROXY_CID};
 use tracing::{debug, error, info, warn};
 use vsock::VsockStream;
@@ -64,9 +65,12 @@ fn get_secret_connection(
 
 /// a simple req-rep handling loop
 pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
-    let mconfig: bincode::Result<NitroConfig> = bincode::deserialize_from(&mut config_stream);
+    let json_raw = read_u16_payload(&mut config_stream)
+        .map_err(|_e| format_err!(IoError, "failed to read config"))?;
+    let mconfig = serde_json::from_slice(&json_raw);
     match mconfig {
         Ok(config) => {
+            let config: NitroConfig = config;
             let key_bytes = Zeroizing::new(
                 aws_ne_sys::kms_decrypt(
                     config.aws_region.as_bytes(),

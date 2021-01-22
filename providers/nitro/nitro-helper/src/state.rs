@@ -11,6 +11,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
+use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tracing::{debug, info, warn};
 use vsock::{VsockListener, VsockStream};
 
@@ -77,6 +78,32 @@ impl StateSyncer {
         Ok(consensus_state)
     }
 
+    fn sync_to_stream(&self, stream: &mut VsockStream) -> Result<(), StateError> {
+        let json_raw = serde_json::to_vec(&self.state).map_err(|e| {
+            format_err!(
+                StateErrorKind::SyncError,
+                "failed to serialize state: {}",
+                e
+            )
+        })?;
+        write_u16_payload(stream, &json_raw).map_err(|e| {
+            format_err!(StateErrorKind::SyncError, "failed to write state: {}", e).into()
+        })
+    }
+
+    fn sync_from_stream(mut stream: &mut VsockStream) -> Result<consensus::State, StateError> {
+        let json_raw = read_u16_payload(&mut stream)
+            .map_err(|e| format_err!(StateErrorKind::SyncError, "failed to read state: {}", e))?;
+        serde_json::from_slice(&json_raw).map_err(|e| {
+            format_err!(
+                StateErrorKind::SyncError,
+                "failed to deserialize state: {}",
+                e
+            )
+            .into()
+        })
+    }
+
     /// Launches the state syncer
     pub fn launch_syncer(mut self) -> thread::JoinHandle<()> {
         thread::spawn(move || {
@@ -88,12 +115,12 @@ impl StateSyncer {
                         debug!("state peer addr: {:?}", stream.peer_addr());
                         debug!("state local addr: {:?}", stream.local_addr());
                         debug!("state fd: {}", stream.as_raw_fd());
-                        if let Err(e) = bincode::serialize_into(&mut stream, &self.state) {
-                            warn!("error serializing to bincode {}", e);
+
+                        if let Err(e) = self.sync_to_stream(&mut stream) {
+                            warn!("error serializing to json {}", e);
                         } else {
                             loop {
-                                if let Ok(consensus_state) = bincode::deserialize_from(&mut stream)
-                                {
+                                if let Ok(consensus_state) = Self::sync_from_stream(&mut stream) {
                                     self.state = consensus_state;
                                     if let Err(e) =
                                         Self::persist_state(&self.state_file_path, &self.state)

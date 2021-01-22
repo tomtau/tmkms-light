@@ -1,4 +1,9 @@
+use anomaly::format_err;
+use std::io::{self, Read, Write};
 use std::str::FromStr;
+use tracing::{debug, trace};
+
+use crate::error::{Error, ErrorKind::IoError};
 
 /// Options for displaying public key
 #[derive(Debug)]
@@ -44,4 +49,49 @@ pub fn print_pubkey(
             println!("address: {}", id);
         }
     }
+}
+
+/// Read u16-size payload (for vsock)
+pub fn read_u16_payload<S: Read>(stream: &mut S) -> Result<Vec<u8>, Error> {
+    let mut len_b = [0u8; 2];
+    stream
+        .read_exact(&mut len_b)
+        .map_err(|e| format_err!(IoError, "error reading len: {}", e))?;
+
+    let l = (u16::from_le_bytes(len_b)) as usize;
+    if l > 0 {
+        let mut state_raw = vec![0u8; l];
+        let mut total = 0;
+
+        while let Ok(n) = stream.read(&mut state_raw[total..]) {
+            if n == 0 || n + total > l {
+                break;
+            }
+            total += n;
+        }
+
+        if total == 0 {
+            return Err(IoError.into());
+        }
+        state_raw.resize(total, 0);
+        Ok(state_raw)
+    } else {
+        trace!("read empty payload");
+        Ok(Vec::default())
+    }
+}
+
+/// Write u16-sized payload (for vsock)
+pub fn write_u16_payload<S: Write>(stream: &mut S, data: &[u8]) -> io::Result<()> {
+    if data.len() > u16::MAX as usize {
+        return Err(io::ErrorKind::InvalidInput.into());
+    }
+    debug!("writing u16-sized payload");
+    let data_len = (data.len() as u16).to_le_bytes();
+
+    stream.write(&data_len)?;
+    stream.write(data)?;
+    stream.flush()?;
+    debug!("successfully wrote u16-sized payload");
+    Ok(())
 }

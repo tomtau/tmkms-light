@@ -15,6 +15,7 @@ use structopt::StructOpt;
 use subtle_encoding::base64;
 use sysinfo::{ProcessExt, SystemExt};
 use tendermint::net;
+use tmkms_light::utils::write_u16_payload;
 use tmkms_light::{
     config::validator::ValidatorConfig,
     utils::{print_pubkey, PubkeyDisplay},
@@ -164,7 +165,8 @@ fn main() {
                 let addr =
                     SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port);
                 let mut socket = vsock::VsockStream::connect(&addr).expect("config stream");
-                bincode::serialize_into(&mut socket, &enclave_config);
+                let config_raw = serde_json::to_vec(&enclave_config).expect("serialize config");
+                write_u16_payload(&mut socket, &config_raw).expect("write config");
                 let proxy = match &config.address {
                     net::Address::Unix { path } => {
                         debug!(

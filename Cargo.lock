@@ -2473,9 +2473,9 @@ version = "0.1.0"
 dependencies = [
  "anomaly",
  "aws-ne-sys",
- "bincode",
  "ed25519-dalek",
  "nix 0.17.0",
+ "serde_json",
  "subtle",
  "tendermint",
  "tendermint-p2p",
@@ -2492,7 +2492,6 @@ name = "tmkms-nitro-helper"
 version = "0.1.0"
 dependencies = [
  "anomaly",
- "bincode",
  "bytes 0.5.6",
  "ed25519",
  "ed25519-dalek",

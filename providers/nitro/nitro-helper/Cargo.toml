@@ -10,7 +10,6 @@ main = ["mz_rusoto_credential", "mz_rusoto_kms", "mz_rusoto_core", "sysinfo"]
 
 [dependencies]
 anomaly = "0.2"
-bincode = "1"
 bytes = "= 0.5"
 ed25519 = { version = "1", features = [ "serde" ] }
 ed25519-dalek = "1"
