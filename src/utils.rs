@@ -32,7 +32,7 @@ pub fn print_pubkey(
 ) {
     match ptype {
         Some(PubkeyDisplay::Bech32) => {
-            let prefix = bech32_prefix.unwrap_or("cosmosvalconspub".to_owned());
+            let prefix = bech32_prefix.unwrap_or_else(|| "cosmosvalconspub".to_owned());
             let mut data = vec![0x16, 0x24, 0xDE, 0x64, 0x20];
             data.extend_from_slice(public.as_bytes());
             println!(
@@ -89,8 +89,8 @@ pub fn write_u16_payload<S: Write>(stream: &mut S, data: &[u8]) -> io::Result<()
     debug!("writing u16-sized payload");
     let data_len = (data.len() as u16).to_le_bytes();
 
-    stream.write(&data_len)?;
-    stream.write(data)?;
+    stream.write_all(&data_len)?;
+    stream.write_all(data)?;
     stream.flush()?;
     debug!("successfully wrote u16-sized payload");
     Ok(())

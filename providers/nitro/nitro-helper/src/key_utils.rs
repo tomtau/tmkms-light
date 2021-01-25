@@ -8,6 +8,7 @@ use std::str::FromStr;
 use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
 
 /// Generates key and encrypts with AWS KMS at the given path
+/// TODO: generate in NE after this is merged https://github.com/aws/aws-nitro-enclaves-sdk-c/pull/25
 pub fn generate_key(
     path: impl AsRef<Path>,
     region: &str,
@@ -16,7 +17,7 @@ pub fn generate_key(
     let region = Region::from_str(region).map_err(|e| format!("invalid region: {}", e))?;
     let mut csprng = OsRng {};
     let keypair: Keypair = Keypair::generate(&mut csprng);
-    let public = keypair.public.clone();
+    let public = keypair.public;
     let mut rt = tokio::runtime::Runtime::new()
         .map_err(|err| format!("Failed to init tokio runtime: {}", err))?;
     let ciphertext = rt
@@ -37,7 +38,7 @@ pub fn generate_key(
                 .map_err(|err| format!("Failed to obtain ciphertext from instance: {}", err))
         })?
         .ciphertext_blob
-        .ok_or("failed to obtain ciphertext blob".to_owned())?;
+        .ok_or_else(|| "failed to obtain ciphertext blob".to_owned())?;
 
     OpenOptions::new()
         .create(true)

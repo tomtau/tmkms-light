@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
 use tendermint::{chain, net};
 
+/// nitro options for toml configuration
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NitroSignOpt {

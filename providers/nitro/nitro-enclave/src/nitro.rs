@@ -18,7 +18,7 @@ use tmkms_light::error::{
 };
 use tmkms_light::utils::read_u16_payload;
 use tmkms_nitro_helper::{NitroConfig, VSOCK_PROXY_CID};
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 use vsock::VsockStream;
 use zeroize::Zeroizing;
 
@@ -121,10 +121,10 @@ pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
                             SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);
                         let socket = vsock::VsockStream::connect(&addr)
                             .map_err(|_e| format_err!(IoError, "failed get privval connection"))?;
-                        debug!("tendermint vsock port: {}", config.enclave_tendermint_conn);
-                        debug!("tendermint peer addr: {:?}", socket.peer_addr());
-                        debug!("tendermint local addr: {:?}", socket.local_addr());
-                        debug!("tendermint fd: {}", socket.as_raw_fd());
+                        trace!("tendermint vsock port: {}", config.enclave_tendermint_conn);
+                        trace!("tendermint peer addr: {:?}", socket.peer_addr());
+                        trace!("tendermint local addr: {:?}", socket.local_addr());
+                        trace!("tendermint fd: {}", socket.as_raw_fd());
                         info!("connected to validator successfully");
                         let plain_conn = PlainConnection::new(socket);
                         Box::new(plain_conn)

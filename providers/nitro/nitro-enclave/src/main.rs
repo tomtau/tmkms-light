@@ -6,8 +6,9 @@ use vsock::VsockListener;
 
 fn main() {
     // TODO: subscriber for production to forward to vsock
+    // TODO: the log level via a command line arg?
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::INFO)
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");

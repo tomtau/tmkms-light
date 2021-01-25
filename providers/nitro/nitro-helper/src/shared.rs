@@ -4,6 +4,7 @@ use tendermint::{chain, node};
 /// CID for listening on the host
 pub const VSOCK_PROXY_CID: u32 = 3;
 
+/// Nitro config to be pushed to the enclave
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NitroConfig {

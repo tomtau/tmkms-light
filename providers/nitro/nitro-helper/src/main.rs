@@ -8,6 +8,8 @@ mod state;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tmkms_light::utils::PubkeyDisplay;
+
+/// Helper sub-commands
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "tmkms-nitro-helper",
@@ -29,7 +31,7 @@ enum TmkmsLight {
         kms_key_id: String,
     },
     #[structopt(name = "start", about = "start tmkms process")]
-    /// start tmkms process
+    /// start tmkms process (push config + start up proxy and state persistence)
     Start {
         #[structopt(short)]
         config_path: Option<PathBuf>,

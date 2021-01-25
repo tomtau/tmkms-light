@@ -14,6 +14,8 @@ use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tracing::{debug, info, warn};
 use vsock::{VsockListener, VsockStream};
 
+/// helps the enclave to load the state previously persisted on the host
+/// + to persist new states
 pub struct StateSyncer {
     state_file_path: PathBuf,
     vsock_listener: VsockListener,
@@ -21,6 +23,9 @@ pub struct StateSyncer {
 }
 
 impl StateSyncer {
+    /// creates a new state file or loads the previous one
+    /// and binds a listener for incoming vsock connections from the enclave
+    /// on the proxy CID on the provided port
     pub fn new<P: AsRef<Path>>(path: P, vsock_port: u32) -> Result<Self, StateError> {
         let state_file_path = path.as_ref().to_owned();
         let state = match fs::read_to_string(&path) {
@@ -77,6 +82,7 @@ impl StateSyncer {
         Ok(consensus_state)
     }
 
+    /// dump the current state to the provided vsock stream
     fn sync_to_stream(&self, stream: &mut VsockStream) -> Result<(), StateError> {
         let json_raw = serde_json::to_vec(&self.state).map_err(|e| {
             format_err!(
@@ -90,6 +96,7 @@ impl StateSyncer {
         })
     }
 
+    /// load state from the provided vsock stream
     fn sync_from_stream(mut stream: &mut VsockStream) -> Result<consensus::State, StateError> {
         let json_raw = read_u16_payload(&mut stream)
             .map_err(|e| format_err!(StateErrorKind::SyncError, "failed to read state: {}", e))?;
@@ -138,6 +145,7 @@ impl StateSyncer {
         })
     }
 
+    /// write the new state into a file on the host
     fn persist_state(path: &PathBuf, new_state: &consensus::State) -> Result<(), StateError> {
         debug!(
             "writing new consensus state to {}: {:?}",

@@ -21,7 +21,7 @@ pub fn init(
     aws_region: String,
     kms_key_id: String,
 ) -> Result<(), String> {
-    let cp = config_path.unwrap_or("tmkms.toml".into());
+    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     let mut config = NitroSignOpt::default();
     config.aws_region = aws_region;
     let t = toml::to_string_pretty(&config)
@@ -31,14 +31,14 @@ pub fn init(
         config
             .sealed_consensus_key_path
             .parent()
-            .ok_or("cannot create a dir in a root directory".to_owned())?,
+            .ok_or_else(|| "cannot create a dir in a root directory".to_owned())?,
     )
     .map_err(|e| format!("failed to create dirs for key storage: {:?}", e))?;
     fs::create_dir_all(
         config
             .state_file_path
             .parent()
-            .ok_or("cannot create a dir in a root directory".to_owned())?,
+            .ok_or_else(|| "cannot create a dir in a root directory".to_owned())?,
     )
     .map_err(|e| format!("failed to create dirs for state storage: {:?}", e))?;
     let pubkey = generate_key(
@@ -57,7 +57,7 @@ pub fn init(
 
 /// push config to enclave, start up a proxy (if needed) + state syncer
 pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
-    let cp = config_path.unwrap_or("tmkms.toml".into());
+    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     if !cp.exists() {
         Err("missing tmkms.toml file".to_owned())
     } else {
@@ -83,7 +83,7 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
         let config: NitroSignOpt = toml::from_str(&toml_string)
             .map_err(|e| format!("toml config file failed to parse: {:?}", e))?;
         let credentials = if let Some(credentials) = config.credentials {
-            credentials.clone()
+            credentials
         } else {
             let mut rt = tokio::runtime::Runtime::new()
                 .map_err(|e| format!("failed to get tokio runtime: {:?}", e))?;
@@ -96,12 +96,12 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
                 aws_session_token: credentials
                     .token()
                     .as_ref()
-                    .ok_or("failed to get a session token".to_owned())?
+                    .ok_or_else(|| "failed to get a session token".to_owned())?
                     .to_owned(),
             }
         };
         let peer_id = match &config.address {
-            net::Address::Tcp { peer_id, .. } => peer_id.clone(),
+            net::Address::Tcp { peer_id, .. } => *peer_id,
             _ => None,
         };
         let state_syncer = StateSyncer::new(config.state_file_path, config.enclave_state_port)
@@ -122,7 +122,7 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
         };
         let enclave_config = NitroConfig {
             chain_id: config.chain_id.clone(),
-            max_height: config.max_height.clone(),
+            max_height: config.max_height,
             sealed_consensus_key,
             sealed_id_key,
             peer_id,
