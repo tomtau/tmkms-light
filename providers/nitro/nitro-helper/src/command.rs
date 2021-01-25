@@ -78,22 +78,25 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
 
         tracing::subscriber::set_global_default(subscriber)
             .map_err(|e| format!("setting default subscriber failed: {:?}", e))?;
-        let toml_string = fs::read_to_string(cp).expect("toml config file read");
-        let config: NitroSignOpt = toml::from_str(&toml_string).expect("configuration");
+        let toml_string = fs::read_to_string(cp)
+            .map_err(|e| format!("toml config file failed to read: {:?}", e))?;
+        let config: NitroSignOpt = toml::from_str(&toml_string)
+            .map_err(|e| format!("toml config file failed to parse: {:?}", e))?;
         let credentials = if let Some(credentials) = config.credentials {
             credentials.clone()
         } else {
-            let mut rt = tokio::runtime::Runtime::new().expect("tokio runtime");
+            let mut rt = tokio::runtime::Runtime::new()
+                .map_err(|e| format!("failed to get tokio runtime: {:?}", e))?;
             let credentials = rt
                 .block_on(async move { InstanceMetadataProvider::new().credentials().await })
-                .expect("credentials");
+                .map_err(|e| format!("failed to obtain AWS credentials: {:?}", e))?;
             AwsCredentials {
                 aws_key_id: credentials.aws_access_key_id().to_owned(),
                 aws_secret_key: credentials.aws_secret_access_key().to_owned(),
                 aws_session_token: credentials
                     .token()
                     .as_ref()
-                    .expect("session token")
+                    .ok_or("failed to get a session token".to_owned())?
                     .to_owned(),
             }
         };
@@ -102,11 +105,15 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
             _ => None,
         };
         let state_syncer = StateSyncer::new(config.state_file_path, config.enclave_state_port)
-            .expect("state syncer");
-        let sealed_consensus_key = fs::read(config.sealed_consensus_key_path).expect("key bytes");
+            .map_err(|e| format!("failed to get a state syncing helper: {:?}", e))?;
+        let sealed_consensus_key = fs::read(config.sealed_consensus_key_path)
+            .map_err(|e| format!("failed to read a sealed consensus key: {:?}", e))?;
         let sealed_id_key = if let Some(p) = config.sealed_id_key_path {
             if let net::Address::Tcp { .. } = config.address {
-                Some(fs::read(p).expect("key bytes"))
+                Some(
+                    fs::read(p)
+                        .map_err(|e| format!("failed to read a sealed identity key: {:?}", e))?,
+                )
             } else {
                 None
             }
@@ -125,9 +132,16 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
             aws_region: config.aws_region,
         };
         let addr = SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port);
-        let mut socket = vsock::VsockStream::connect(&addr).expect("config stream");
-        let config_raw = serde_json::to_vec(&enclave_config).expect("serialize config");
-        write_u16_payload(&mut socket, &config_raw).expect("write config");
+        let mut socket = vsock::VsockStream::connect(&addr).map_err(|e| {
+            format!(
+                "failed to connect to the enclave to push its config: {:?}",
+                e
+            )
+        })?;
+        let config_raw = serde_json::to_vec(&enclave_config)
+            .map_err(|e| format!("failed to serialize the config: {:?}", e))?;
+        write_u16_payload(&mut socket, &config_raw)
+            .map_err(|e| format!("failed to write the config: {:?}", e))?;
         let proxy = match &config.address {
             net::Address::Unix { path } => {
                 debug!(
@@ -142,6 +156,8 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
         if let Some(p) = proxy {
             p.launch_proxy();
         }
+        // state syncing runs in an infinite loop (so does the proxy)
+        // TODO: check if signal capture + a graceful shutdown would help with anything (given state writing is via "tempfile")
         state_syncer.launch_syncer().join().expect("state syncing");
         Ok(())
     }
