@@ -17,7 +17,6 @@ zeroize = "1"
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 anomaly = "0.2"
 aesm-client = { version = "0.5", features = ["sgxs"] }
-bincode = "1"
 ed25519-dalek = "1"
 enclave-runner = "0.4"
 serde_json = "1"

@@ -8,6 +8,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
+use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tracing::{debug, warn};
 
 pub struct StateSyncer {
@@ -45,16 +46,38 @@ impl StateSyncer {
                 e
             ),
         }?;
-        bincode::serialize_into(&mut stream_to_enclave, &state).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error serializing to bincode {}",
-                e
-            )
-        })?;
+        Self::sync_to_stream(&state, &mut stream_to_enclave)?;
         Ok(Self {
             state_file_path,
             stream_to_enclave,
+        })
+    }
+
+    /// dump the current state to the provided vsock stream
+    fn sync_to_stream(state: &consensus::State, stream: &mut UnixStream) -> Result<(), StateError> {
+        let json_raw = serde_json::to_vec(state).map_err(|e| {
+            format_err!(
+                StateErrorKind::SyncError,
+                "failed to serialize state: {}",
+                e
+            )
+        })?;
+        write_u16_payload(stream, &json_raw).map_err(|e| {
+            format_err!(StateErrorKind::SyncError, "failed to write state: {}", e).into()
+        })
+    }
+
+    /// load state from the provided vsock stream
+    fn sync_from_stream(&mut self) -> Result<consensus::State, StateError> {
+        let json_raw = read_u16_payload(&mut self.stream_to_enclave)
+            .map_err(|e| format_err!(StateErrorKind::SyncError, "failed to read state: {}", e))?;
+        serde_json::from_slice(&json_raw).map_err(|e| {
+            format_err!(
+                StateErrorKind::SyncError,
+                "failed to deserialize state: {}",
+                e
+            )
+            .into()
         })
     }
 
@@ -74,8 +97,7 @@ impl StateSyncer {
     /// Launches the state syncer
     pub fn launch_syncer(mut self) {
         thread::spawn(move || loop {
-            if let Ok(ref consensus_state) = bincode::deserialize_from(&mut self.stream_to_enclave)
-            {
+            if let Ok(ref consensus_state) = self.sync_from_stream() {
                 if let Err(e) = Self::persist_state(&self.state_file_path, consensus_state) {
                     warn!("state persistence failed: {}", e);
                 }

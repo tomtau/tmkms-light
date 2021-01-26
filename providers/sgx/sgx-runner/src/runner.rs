@@ -1,18 +1,21 @@
 use crate::shared::{RemoteConnectionConfig, SealedKeyData, SgxInitRequest, SgxInitResponse};
 use crate::state::StateSyncer;
 use aesm_client::AesmClient;
+use anomaly::format_err;
 use enclave_runner::{
     usercalls::{AsyncStream, UsercallExtension},
     EnclaveBuilder,
 };
 use sgxs_loaders::isgx::Device;
-use std::fs;
 use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::thread;
+use std::{fs, path::PathBuf};
 use std::{future::Future, io, pin::Pin};
 use tendermint::net;
 use tmkms_light::config::validator::ValidatorConfig;
+use tmkms_light::error::{Error, ErrorKind::IoError};
+use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 
 /// type alias for outputs in UsercallExtension async return type
 type UserCallStream = io::Result<Option<Box<dyn AsyncStream>>>;
@@ -23,7 +26,7 @@ type UserCallStream = io::Result<Option<Box<dyn AsyncStream>>>;
 struct TmkmsSgxRunner {
     init_stream: UnixStream,
     state_stream: UnixStream,
-    tm_conn: Option<UnixStream>,
+    tm_conn: Option<PathBuf>,
 }
 
 impl UsercallExtension for TmkmsSgxRunner {
@@ -44,8 +47,8 @@ impl UsercallExtension for TmkmsSgxRunner {
                     Ok(Some(Box::new(stream)))
                 }
                 "tendermint" => {
-                    if let Some(ref conn) = this.tm_conn {
-                        let stream = tokio::net::UnixStream::from_std(conn.try_clone()?)?;
+                    if let Some(ref path) = this.tm_conn {
+                        let stream = tokio::net::UnixStream::connect(path).await?;
                         Ok(Some(Box::new(stream)))
                     } else {
                         Ok(None)
@@ -68,7 +71,7 @@ impl TmkmsSgxSigner {
     /// launches the `tmkms-light-sgx-app` from the provided path
     pub fn launch_enclave_app<P: AsRef<Path>>(
         sgxs_path: P,
-        tm_conn: Option<UnixStream>,
+        tm_conn: Option<PathBuf>,
         state_path: P,
     ) -> io::Result<Self> {
         let (stream_to_enclave, init_stream) = UnixStream::pair()?;
@@ -102,13 +105,19 @@ impl TmkmsSgxSigner {
     }
 
     /// req-rep helper
-    fn exchange(&self, request: SgxInitRequest) -> bincode::Result<SgxInitResponse> {
-        bincode::serialize_into(&self.stream_to_enclave, &request)?;
-        bincode::deserialize_from(&self.stream_to_enclave)
+    fn exchange(&mut self, request: SgxInitRequest) -> Result<SgxInitResponse, Error> {
+        let req_bytes = serde_json::to_vec(&request)
+            .map_err(|e| format_err!(IoError, "error serializing request: {}", e))?;
+        write_u16_payload(&mut self.stream_to_enclave, &req_bytes)
+            .map_err(|e| format_err!(IoError, "error writing request: {}", e))?;
+        let response_bytes = read_u16_payload(&mut self.stream_to_enclave)?;
+        let resp: SgxInitResponse = serde_json::from_slice(&response_bytes)
+            .map_err(|e| format_err!(IoError, "error deserializing response: {}", e))?;
+        Ok(resp)
     }
 
     /// generate a new keypair
-    pub fn keygen(self) -> Result<SealedKeyData, ()> {
+    pub fn keygen(mut self) -> Result<SealedKeyData, ()> {
         match self.exchange(SgxInitRequest::KeyGen {
             cloud_backup_key: None,
         }) {
@@ -124,13 +133,13 @@ impl TmkmsSgxSigner {
 
     /// run the main privval handling
     pub fn start<P: AsRef<Path>>(
-        self,
+        mut self,
         sealed_key_path: P,
         config: ValidatorConfig,
         remote_conn: Option<(net::Address, P)>,
     ) -> Result<(), ()> {
         let sealed_key: SealedKeyData =
-            bincode::deserialize(&fs::read(sealed_key_path).map_err(|_| ())?).map_err(|_| ())?;
+            serde_json::from_slice(&fs::read(sealed_key_path).map_err(|_| ())?).map_err(|_| ())?;
         let secret_connection = match remote_conn {
             Some((
                 net::Address::Tcp {
@@ -141,7 +150,7 @@ impl TmkmsSgxSigner {
                 id_path,
             )) => {
                 let sealed_id_key: SealedKeyData =
-                    bincode::deserialize(&fs::read(id_path).map_err(|_| ())?).map_err(|_| ())?;
+                    serde_json::from_slice(&fs::read(id_path).map_err(|_| ())?).map_err(|_| ())?;
                 Some(RemoteConnectionConfig {
                     peer_id,
                     host,
@@ -151,15 +160,13 @@ impl TmkmsSgxSigner {
             }
             _ => None,
         };
-        bincode::serialize_into(
-            &self.stream_to_enclave,
-            &SgxInitRequest::Start {
-                sealed_key,
-                config,
-                secret_connection,
-            },
-        )
+        let req_bytes = serde_json::to_vec(&SgxInitRequest::Start {
+            sealed_key,
+            config,
+            secret_connection,
+        })
         .map_err(|_| ())?;
+        write_u16_payload(&mut self.stream_to_enclave, &req_bytes).map_err(|_| ())?;
 
         Ok(self.enclave_app_thread.join().map_err(|_| ())?)
     }

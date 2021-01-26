@@ -6,7 +6,6 @@ edition = "2018"
 
 [target.'cfg(target_env = "sgx")'.dependencies]
 anomaly = "0.2"
-bincode = "1"
 ed25519-dalek = "1"
 rand = "0.7"
 aes-gcm-siv = "0.9"

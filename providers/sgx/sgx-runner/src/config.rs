@@ -1,14 +1,11 @@
 use crate::shared::SealedKeyData;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
-use std::{
-    fs::OpenOptions,
-    io::{self, Write},
-    os::unix::fs::OpenOptionsExt,
-    path::Path,
-};
+use std::{fs::OpenOptions, io, os::unix::fs::OpenOptionsExt, path::Path};
 use tendermint::{chain, net};
+use tracing::error;
 
+/// runner configuration in toml
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SgxSignOpt {
@@ -52,7 +49,10 @@ pub fn write_sealed_file<P: AsRef<Path>>(path: P, sealed_data: &SealedKeyData) -
         .truncate(true)
         .mode(0o600)
         .open(path.as_ref())
-        .and_then(|mut file| {
-            file.write_all(&bincode::serialize(sealed_data).expect("serialize sealed data"))
+        .and_then(|file| {
+            serde_json::to_writer(file, sealed_data).map_err(|e| {
+                error!("failed to write sealed key: {:?}", e);
+                io::ErrorKind::Other.into()
+            })
         })
 }

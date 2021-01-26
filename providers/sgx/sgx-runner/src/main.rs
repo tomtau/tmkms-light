@@ -3,7 +3,7 @@ mod runner;
 mod shared;
 mod state;
 use runner::TmkmsSgxSigner;
-use std::{fmt::Debug, os::unix::net::UnixStream};
+use std::fmt::Debug;
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 use tendermint::net;
@@ -105,8 +105,7 @@ fn main() {
                             &config.chain_id, &config.address
                         );
 
-                        let socket = UnixStream::connect(path).expect("unix socket open");
-                        Some(socket)
+                        Some(path.clone())
                     }
                     _ => None,
                 };
