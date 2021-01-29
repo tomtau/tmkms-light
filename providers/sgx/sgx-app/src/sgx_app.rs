@@ -5,16 +5,21 @@ mod state;
 use ed25519_dalek::Keypair;
 use rand::rngs::OsRng;
 use std::io;
+use std::io::Read;
+use std::io::Write;
 use std::net::TcpStream;
+use std::thread;
+use std::time::Duration;
 use subtle::ConstantTimeEq;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
 use tmkms_light::chain::state::PersistStateSync;
 use tmkms_light::connection::{Connection, PlainConnection};
+use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tmkms_light_sgx_runner::RemoteConnectionConfig;
 use tmkms_light_sgx_runner::{SgxInitRequest, SgxInitResponse};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
-fn get_secret_connection(config: RemoteConnectionConfig) -> io::Result<Box<dyn Connection>> {
+fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn Connection>> {
     let RemoteConnectionConfig {
         peer_id,
         host,
@@ -60,12 +65,33 @@ fn get_secret_connection(config: RemoteConnectionConfig) -> io::Result<Box<dyn C
     }
 }
 
+pub fn get_connection(secret_connection: Option<&RemoteConnectionConfig>) -> Box<dyn Connection> {
+    loop {
+        let conn: io::Result<Box<dyn Connection>> = if let Some(config) = secret_connection {
+            get_secret_connection(config)
+        } else {
+            TcpStream::connect("tendermint").map(|socket| {
+                let plain_conn = PlainConnection::new(socket);
+                Box::new(plain_conn) as Box<dyn Connection>
+            })
+        };
+        if let Err(e) = conn {
+            error!("tendermint connection error {:?}", e);
+            thread::sleep(Duration::new(1, 0));
+        } else {
+            return conn.unwrap();
+        }
+    }
+}
+
 /// a simple req-rep handling loop
 /// `TcpStream` is either provided in tests or from the "signatory-sgx"
 /// enclave runner's user call extension.
-pub fn entry(mut signatory_signer: TcpStream) -> io::Result<()> {
+pub fn entry(mut signatory_signer: TcpStream, command: String) -> io::Result<()> {
     let mut csprng = OsRng {};
-    let request: bincode::Result<SgxInitRequest> = bincode::deserialize_from(&mut signatory_signer);
+    debug!("reading request");
+    let request = serde_json::from_str(&command);
+
     match request {
         Ok(SgxInitRequest::KeyGen {
             cloud_backup_key: _,
@@ -76,8 +102,14 @@ pub fn entry(mut signatory_signer: TcpStream) -> io::Result<()> {
                     sealed_key_data,
                     cloud_backup_key_data: None, // TODO
                 };
-                if let Err(e) = bincode::serialize_into(&mut signatory_signer, &response) {
-                    error!("keygen error: {}", e);
+                match serde_json::to_vec(&response) {
+                    Ok(v) => {
+                        debug!("writing response");
+                        write_u16_payload(&mut signatory_signer, &v)?;
+                    }
+                    Err(e) => {
+                        error!("keygen error: {}", e);
+                    }
                 }
             } else {
                 error!("sealing failed");
@@ -93,32 +125,27 @@ pub fn entry(mut signatory_signer: TcpStream) -> io::Result<()> {
             sealed_key,
             config,
             secret_connection,
+            initial_state,
         }) => {
             let mut state_holder = state::StateHolder::new()?;
-            let conn: Box<dyn Connection> = if let Some(config) = secret_connection {
-                get_secret_connection(config)?
-            } else {
-                let socket = TcpStream::connect("tendermint")?;
-                let plain_conn = PlainConnection::new(socket);
-                Box::new(plain_conn)
-            };
-            if let Ok(state) = state_holder.load_state() {
-                if let Ok(keypair) = keypair_seal::unseal(&sealed_key) {
-                    let mut session = tmkms_light::session::Session::new(
-                        config,
-                        conn,
-                        keypair,
-                        state,
-                        state_holder,
-                    );
+            if let Ok(keypair) = keypair_seal::unseal(&sealed_key) {
+                let conn: Box<dyn Connection> = get_connection(secret_connection.as_ref());
+                let mut session = tmkms_light::session::Session::new(
+                    config,
+                    conn,
+                    keypair,
+                    initial_state.into(),
+                    state_holder,
+                );
+                loop {
                     if let Err(e) = session.request_loop() {
                         error!("request error: {}", e);
                     }
-                } else {
-                    error!("unsealing failed");
+                    let conn: Box<dyn Connection> = get_connection(secret_connection.as_ref());
+                    session.reset_connection(conn);
                 }
             } else {
-                error!("initial state loading failed");
+                error!("unsealing failed");
             }
         }
         Err(e) => {

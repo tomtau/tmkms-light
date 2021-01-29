@@ -30,6 +30,10 @@ pub struct Session<S: PersistStateSync> {
 }
 
 impl<S: PersistStateSync> Session<S> {
+    pub fn reset_connection(&mut self, connection: Box<dyn Connection>) {
+        self.connection = connection;
+    }
+
     pub fn new(
         config: ValidatorConfig,
         connection: Box<dyn Connection>,

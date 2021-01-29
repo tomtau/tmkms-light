@@ -8,7 +8,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
-use tmkms_light::utils::{read_u16_payload, write_u16_payload};
+use tmkms_light::utils::read_u16_payload;
 use tracing::{debug, warn};
 
 pub struct StateSyncer {
@@ -19,8 +19,8 @@ pub struct StateSyncer {
 impl StateSyncer {
     pub fn new<P: AsRef<Path>>(
         path: P,
-        mut stream_to_enclave: UnixStream,
-    ) -> Result<Self, StateError> {
+        stream_to_enclave: UnixStream,
+    ) -> Result<(Self, consensus::State), StateError> {
         let state_file_path = path.as_ref().to_owned();
         let state = match fs::read_to_string(&path) {
             Ok(state_json) => {
@@ -46,25 +46,13 @@ impl StateSyncer {
                 e
             ),
         }?;
-        Self::sync_to_stream(&state, &mut stream_to_enclave)?;
-        Ok(Self {
-            state_file_path,
-            stream_to_enclave,
-        })
-    }
-
-    /// dump the current state to the provided vsock stream
-    fn sync_to_stream(state: &consensus::State, stream: &mut UnixStream) -> Result<(), StateError> {
-        let json_raw = serde_json::to_vec(state).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "failed to serialize state: {}",
-                e
-            )
-        })?;
-        write_u16_payload(stream, &json_raw).map_err(|e| {
-            format_err!(StateErrorKind::SyncError, "failed to write state: {}", e).into()
-        })
+        Ok((
+            Self {
+                state_file_path,
+                stream_to_enclave,
+            },
+            state,
+        ))
     }
 
     /// load state from the provided vsock stream

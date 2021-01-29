@@ -3,7 +3,7 @@ mod runner;
 mod shared;
 mod state;
 use runner::TmkmsSgxSigner;
-use std::fmt::Debug;
+use std::{fmt::Debug, thread, time::Duration};
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 use tendermint::net;
@@ -11,6 +11,7 @@ use tmkms_light::{
     config::validator::ValidatorConfig,
     utils::{print_pubkey, PubkeyDisplay},
 };
+use tmkms_light_sgx_runner::SgxInitRequest;
 use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
 
@@ -40,6 +41,11 @@ enum TmkmsLight {
 
 fn main() {
     let opt = TmkmsLight::from_args();
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::DEBUG)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     match opt {
         TmkmsLight::Init {
             config_path,
@@ -59,12 +65,23 @@ fn main() {
             .expect("create dirs for key storage");
             fs::create_dir_all(config.state_file_path.parent().expect("not root dir"))
                 .expect("create dirs for key storage");
+            let request = SgxInitRequest::KeyGen {
+                cloud_backup_key: None,
+            };
+            let request_bytes = serde_json::to_vec(&request).expect("serde");
+            debug!("launching enclave");
+            let (state_syncer, _, state_stream) =
+                TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
+
             let runner = TmkmsSgxSigner::launch_enclave_app(
                 &config.enclave_path,
                 None,
-                &config.state_file_path,
+                state_syncer,
+                state_stream,
+                &[&request_bytes],
             )
             .expect("runner");
+            debug!("waiting for keygen");
             let sealed_key = runner.keygen().expect("gen key");
             config::write_sealed_file(config.sealed_consensus_key_path, &sealed_key)
                 .expect("write key");
@@ -73,10 +90,15 @@ fn main() {
                     .expect("valid public key");
             print_pubkey(bech32_prefix, pubkey_display, public_key);
             if let Some(id_path) = config.sealed_id_key_path {
+                let (state_syncer, _, state_stream) =
+                    TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
+
                 let runner = TmkmsSgxSigner::launch_enclave_app(
                     &config.enclave_path,
                     None,
-                    &config.state_file_path,
+                    state_syncer,
+                    state_stream,
+                    &[&request_bytes],
                 )
                 .expect("runner");
                 let sealed_key = runner.keygen().expect("gen key");
@@ -89,12 +111,6 @@ fn main() {
                 eprintln!("missing tmkms.toml file");
                 std::process::exit(1);
             } else {
-                let subscriber = FmtSubscriber::builder()
-                    .with_max_level(Level::INFO)
-                    .finish();
-
-                tracing::subscriber::set_global_default(subscriber)
-                    .expect("setting default subscriber failed");
                 let toml_string = fs::read_to_string(cp).expect("toml config file read");
                 let config: config::SgxSignOpt =
                     toml::from_str(&toml_string).expect("configuration");
@@ -114,22 +130,27 @@ fn main() {
                 } else {
                     None
                 };
+                let (state_syncer, state, state_stream) =
+                    TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
+                let start_request_bytes = TmkmsSgxSigner::get_start_request_bytes(
+                    config.sealed_consensus_key_path,
+                    ValidatorConfig {
+                        chain_id: config.chain_id,
+                        max_height: config.max_height,
+                    },
+                    state,
+                    remote,
+                )
+                .expect("start");
                 let runner = TmkmsSgxSigner::launch_enclave_app(
                     &config.enclave_path,
                     tm_conn,
-                    &config.state_file_path,
+                    state_syncer,
+                    state_stream,
+                    &[&start_request_bytes],
                 )
                 .expect("runner");
-                runner
-                    .start(
-                        config.sealed_consensus_key_path,
-                        ValidatorConfig {
-                            chain_id: config.chain_id,
-                            max_height: config.max_height,
-                        },
-                        remote,
-                    )
-                    .expect("request loop");
+                runner.start().expect("request loop");
             }
         }
     }

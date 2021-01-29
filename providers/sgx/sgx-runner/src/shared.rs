@@ -2,6 +2,7 @@ use secrecy::{DebugSecret, Secret, SerializableSecret};
 use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize, Serializer};
 use sgx_isa::{Keypolicy, Keyrequest};
 use std::convert::TryInto;
+use tendermint::consensus;
 use tendermint::node;
 use tmkms_light::config::validator::ValidatorConfig;
 use zeroize::{Zeroize, Zeroizing};
@@ -146,6 +147,7 @@ pub enum SgxInitRequest {
         sealed_key: SealedKeyData,
         config: ValidatorConfig,
         secret_connection: Option<RemoteConnectionConfig>,
+        initial_state: consensus::State,
     },
 }
 
