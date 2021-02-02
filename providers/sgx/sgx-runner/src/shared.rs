@@ -16,7 +16,7 @@ pub type Ciphertext = Vec<u8>;
 /// this partially duplicates `Keyrequest` from sgx-isa,
 /// which doesn't implement serde traits
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
-pub struct KeyRequest {
+pub struct KeyRequestWrap {
     pub keyname: u16,
     pub keypolicy: u16,
     pub isvsvn: u16,
@@ -26,7 +26,7 @@ pub struct KeyRequest {
     pub miscmask: u32,
 }
 
-impl TryInto<Keyrequest> for KeyRequest {
+impl TryInto<Keyrequest> for KeyRequestWrap {
     type Error = ();
 
     fn try_into(self) -> Result<Keyrequest, ()> {
@@ -44,9 +44,9 @@ impl TryInto<Keyrequest> for KeyRequest {
     }
 }
 
-impl From<Keyrequest> for KeyRequest {
+impl From<Keyrequest> for KeyRequestWrap {
     fn from(kr: Keyrequest) -> Self {
-        KeyRequest {
+        KeyRequestWrap {
             keyname: kr.keyname,
             keypolicy: kr.keypolicy.bits(),
             isvsvn: kr.isvsvn,
@@ -62,7 +62,7 @@ impl From<Keyrequest> for KeyRequest {
 /// and expected to be persisted by tmkms
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SealedKeyData {
-    pub seal_key_request: KeyRequest,
+    pub seal_key_request: KeyRequestWrap,
     pub nonce: AesGcm128SivNonce,
     pub sealed_secret: Ciphertext,
 }
@@ -73,35 +73,7 @@ pub type PublicKey = [u8; 32];
 const CLOUD_KEY_LEN: usize = 16;
 
 /// symmetric key wrap -- e.g. from cloud KMS
-#[derive(Zeroize, Clone)]
-pub struct CloudWrapKeyInner([u8; CLOUD_KEY_LEN]);
-
-impl<'de> Deserialize<'de> for CloudWrapKeyInner {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let data = Zeroizing::new(
-            Vec::deserialize(deserializer).map_err(|e| D::Error::custom(format!("{}", e)))?,
-        );
-        if data.len() != CLOUD_KEY_LEN {
-            return Err(D::Error::custom("incorrect key length"));
-        } else {
-            let mut inner = [0u8; CLOUD_KEY_LEN];
-            inner.clone_from_slice(&data);
-            return Ok(Self(inner));
-        }
-    }
-}
-
-impl Serialize for CloudWrapKeyInner {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        Zeroizing::new(self.0).serialize(serializer)
-    }
-}
-
-impl SerializableSecret for CloudWrapKeyInner {}
-impl DebugSecret for CloudWrapKeyInner {}
-
-/// symmetric key wrap -- e.g. from cloud KMS
-pub type CloudWrapKey = Secret<CloudWrapKeyInner>;
+pub type CloudWrapKey = Secret<[u8; CLOUD_KEY_LEN]>;
 
 /// Returned from the enclave app after keygen
 /// if the cloud backup option is requested.
@@ -134,14 +106,9 @@ pub struct RemoteConnectionConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SgxInitRequest {
     /// generate a new keypair
-    KeyGen {
-        cloud_backup_key: Option<CloudWrapKey>,
-    },
+    KeyGen { cloud_backup_key: bool },
     /// reseal the keypair from a backup
-    CloudRecover {
-        cloud_backup_key: CloudWrapKey,
-        key_data: CloudBackupKeyData,
-    },
+    CloudRecover { key_data: CloudBackupKeyData },
     /// start the main loop for processing Tendermint privval requests
     Start {
         sealed_key: SealedKeyData,

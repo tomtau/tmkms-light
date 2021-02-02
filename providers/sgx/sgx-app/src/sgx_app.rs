@@ -116,7 +116,6 @@ pub fn entry(mut signatory_signer: TcpStream, command: String) -> io::Result<()>
             }
         }
         Ok(SgxInitRequest::CloudRecover {
-            cloud_backup_key: _,
             key_data: _,
         }) => {
             // TODO
