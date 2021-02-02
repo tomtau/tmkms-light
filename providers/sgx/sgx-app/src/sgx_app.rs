@@ -5,18 +5,15 @@ mod state;
 use ed25519_dalek::Keypair;
 use rand::rngs::OsRng;
 use std::io;
-use std::io::Read;
-use std::io::Write;
 use std::net::TcpStream;
 use std::thread;
 use std::time::Duration;
 use subtle::ConstantTimeEq;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
-use tmkms_light::chain::state::PersistStateSync;
 use tmkms_light::connection::{Connection, PlainConnection};
-use tmkms_light::utils::{read_u16_payload, write_u16_payload};
+use tmkms_light::utils::write_u16_payload;
 use tmkms_light_sgx_runner::RemoteConnectionConfig;
-use tmkms_light_sgx_runner::{SgxInitRequest, SgxInitResponse};
+use tmkms_light_sgx_runner::{CloudWrapKey, SgxInitRequest, SgxInitResponse};
 use tracing::{debug, error, info, warn};
 
 fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn Connection>> {
@@ -87,20 +84,21 @@ pub fn get_connection(secret_connection: Option<&RemoteConnectionConfig>) -> Box
 /// a simple req-rep handling loop
 /// `TcpStream` is either provided in tests or from the "signatory-sgx"
 /// enclave runner's user call extension.
-pub fn entry(mut signatory_signer: TcpStream, command: String) -> io::Result<()> {
+pub fn entry(
+    mut signatory_signer: TcpStream,
+    request: SgxInitRequest,
+    cloud_backup_key: Option<CloudWrapKey>,
+) -> io::Result<()> {
     let mut csprng = OsRng {};
-    debug!("reading request");
-    let request = serde_json::from_str(&command);
-
-    match request {
-        Ok(SgxInitRequest::KeyGen {
-            cloud_backup_key: _,
-        }) => {
+    match (request, cloud_backup_key) {
+        (SgxInitRequest::KeyGen, cbk) => {
             let kp = Keypair::generate(&mut csprng);
+            let cloud_backup_key_data =
+                cbk.and_then(|key| keypair_seal::cloud_backup(&mut csprng, key, &kp).ok());
             if let Ok(sealed_key_data) = keypair_seal::seal(&mut csprng, &kp) {
                 let response = SgxInitResponse {
                     sealed_key_data,
-                    cloud_backup_key_data: None, // TODO
+                    cloud_backup_key_data,
                 };
                 match serde_json::to_vec(&response) {
                     Ok(v) => {
@@ -115,18 +113,37 @@ pub fn entry(mut signatory_signer: TcpStream, command: String) -> io::Result<()>
                 error!("sealing failed");
             }
         }
-        Ok(SgxInitRequest::CloudRecover {
-            key_data: _,
-        }) => {
-            // TODO
+        (SgxInitRequest::CloudRecover { key_data }, Some(backup_key)) => {
+            if let Ok(sealed_key_data) =
+                keypair_seal::seal_recover_cloud_backup(&mut csprng, backup_key, key_data)
+            {
+                let response = SgxInitResponse {
+                    sealed_key_data,
+                    cloud_backup_key_data: None,
+                };
+                match serde_json::to_vec(&response) {
+                    Ok(v) => {
+                        debug!("writing response");
+                        write_u16_payload(&mut signatory_signer, &v)?;
+                    }
+                    Err(e) => {
+                        error!("recovery error: {}", e);
+                    }
+                }
+            } else {
+                error!("recovery failed");
+            }
         }
-        Ok(SgxInitRequest::Start {
-            sealed_key,
-            config,
-            secret_connection,
-            initial_state,
-        }) => {
-            let mut state_holder = state::StateHolder::new()?;
+        (
+            SgxInitRequest::Start {
+                sealed_key,
+                config,
+                secret_connection,
+                initial_state,
+            },
+            None,
+        ) => {
+            let state_holder = state::StateHolder::new()?;
             if let Ok(keypair) = keypair_seal::unseal(&sealed_key) {
                 let conn: Box<dyn Connection> = get_connection(secret_connection.as_ref());
                 let mut session = tmkms_light::session::Session::new(
@@ -145,10 +162,12 @@ pub fn entry(mut signatory_signer: TcpStream, command: String) -> io::Result<()>
                 }
             } else {
                 error!("unsealing failed");
+                return Err(io::ErrorKind::Other.into());
             }
         }
-        Err(e) => {
-            error!("init error: {}", e);
+        _ => {
+            error!("invalid command arguments");
+            return Err(io::ErrorKind::Other.into());
         }
     }
     Ok(())

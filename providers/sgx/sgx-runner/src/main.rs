@@ -65,9 +65,7 @@ fn main() {
             .expect("create dirs for key storage");
             fs::create_dir_all(config.state_file_path.parent().expect("not root dir"))
                 .expect("create dirs for key storage");
-            let request = SgxInitRequest::KeyGen {
-                cloud_backup_key: false,
-            };
+            let request = SgxInitRequest::KeyGen;
             let request_bytes = serde_json::to_vec(&request).expect("serde");
             debug!("launching enclave");
             let (state_syncer, _, state_stream) =

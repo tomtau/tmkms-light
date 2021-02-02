@@ -8,16 +8,31 @@ fn main() -> std::io::Result<()> {
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    let command = std::env::args().next();
+    let mut args = std::env::args();
+    let command = args.next();
     if command.is_none() {
         tracing::error!("no enclave command provided");
         return Err(std::io::ErrorKind::Other.into());
     }
+    let request = serde_json::from_str(&command.unwrap());
+    if request.is_err() {
+        tracing::error!("invalid enclave command provided");
+        return Err(std::io::ErrorKind::Other.into());
+    }
+    let request = request.unwrap();
+    let mcloud_key = args.next();
+    let cloud_key = if let Some(k) = mcloud_key {
+        let decoded_vec = subtle_encoding::hex::decode(k)
+            .map_err(|_e| std::io::Error::from(std::io::ErrorKind::Other))?;
+        tmkms_light_sgx_runner::CloudWrapKey::new(decoded_vec)
+    } else {
+        None
+    };
     // "init" stream is provided by the enclave runner
     // user call extension (in sgx-runner)
     let init_conn = std::net::TcpStream::connect("init")?;
     tracing::info!("connected");
-    if let Err(e) = sgx_app::entry(init_conn, command.unwrap()) {
+    if let Err(e) = sgx_app::entry(init_conn, request, cloud_key) {
         tracing::error!("error: {}", e);
         Err(e)
     } else {

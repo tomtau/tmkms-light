@@ -9,7 +9,9 @@ anomaly = "0.2"
 ed25519-dalek = "1"
 rand = "0.7"
 aes-gcm-siv = "0.9"
+secrecy = { version = "0.7" }
 subtle = "2"
+subtle-encoding = { version = "0.5" }
 sgx-isa = { version = "0.3", features = ["sgxstd"] }
 zeroize = "1"
 tendermint-p2p = { version = "0.17" }

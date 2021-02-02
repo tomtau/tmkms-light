@@ -3,10 +3,62 @@ use aes_gcm_siv::Aes128GcmSiv;
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::rngs::OsRng;
 use rand::RngCore;
+use secrecy::ExposeSecret;
 use sgx_isa::{ErrorCode, Keyname, Keypolicy, Keyrequest, Report};
 use std::convert::TryInto;
-use tmkms_light_sgx_runner::SealedKeyData;
+use tmkms_light_sgx_runner::{CloudBackupKeyData, CloudWrapKey, SealedKeyData};
 use zeroize::Zeroize;
+
+pub fn cloud_backup(
+    csprng: &mut OsRng,
+    seal_key: CloudWrapKey,
+    keypair: &Keypair,
+) -> Result<CloudBackupKeyData, aes_gcm_siv::aead::Error> {
+    let mut nonce = [0u8; 12];
+    csprng.fill_bytes(&mut nonce);
+    let payload = Payload {
+        msg: keypair.secret.as_bytes(),
+        aad: keypair.public.as_bytes(),
+    };
+    let nonce_ga = GenericArray::from_slice(&nonce);
+    let gk = GenericArray::from_slice(seal_key.expose_secret());
+    let aead = Aes128GcmSiv::new(gk);
+    aead.encrypt(nonce_ga, payload)
+        .map(|sealed_secret| CloudBackupKeyData {
+            sealed_secret,
+            nonce,
+            public_key: keypair.public.clone(),
+        })
+}
+
+pub fn seal_recover_cloud_backup(
+    csprng: &mut OsRng,
+    seal_key: CloudWrapKey,
+    backup_data: CloudBackupKeyData,
+) -> Result<SealedKeyData, ErrorCode> {
+    let nonce_ga = GenericArray::from_slice(&backup_data.nonce);
+    let gk = GenericArray::from_slice(&seal_key.expose_secret());
+    let aead = Aes128GcmSiv::new(gk);
+    let payload = Payload {
+        msg: &backup_data.sealed_secret,
+        aad: backup_data.public_key.as_bytes(),
+    };
+    if let Ok(mut secret_key) = aead.decrypt(nonce_ga, payload) {
+        drop(seal_key);
+        let secret = SecretKey::from_bytes(&secret_key).map_err(|_| ErrorCode::InvalidSignature)?;
+        secret_key.zeroize();
+        let mut kp = Keypair {
+            secret,
+            public: backup_data.public_key,
+        };
+        let sealed = seal(csprng, &kp);
+        kp.secret.zeroize();
+        sealed
+    } else {
+        drop(seal_key);
+        Err(ErrorCode::MacCompareFail)
+    }
+}
 
 /// Seals the provided ed25519 keypair with `Aes128GcmSiv`
 /// via a key request against MRSIGNER (so that versions with higher `isvsvn`

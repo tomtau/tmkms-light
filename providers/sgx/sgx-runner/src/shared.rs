@@ -1,11 +1,10 @@
-use secrecy::{DebugSecret, Secret, SerializableSecret};
-use serde::{de::Error as DeError, Deserialize, Deserializer, Serialize, Serializer};
+use secrecy::{ExposeSecret, SecretVec};
+use serde::{Deserialize, Serialize};
 use sgx_isa::{Keypolicy, Keyrequest};
 use std::convert::TryInto;
 use tendermint::consensus;
 use tendermint::node;
 use tmkms_light::config::validator::ValidatorConfig;
-use zeroize::{Zeroize, Zeroizing};
 
 /// keyseal is fixed in the enclave app
 pub type AesGcm128SivNonce = [u8; 12];
@@ -70,10 +69,27 @@ pub struct SealedKeyData {
 /// ed25519 pubkey alias
 pub type PublicKey = [u8; 32];
 
+/// length of symmetric key wrap for cloud backup using e.g. cloud KMS
 const CLOUD_KEY_LEN: usize = 16;
 
 /// symmetric key wrap -- e.g. from cloud KMS
-pub type CloudWrapKey = Secret<[u8; CLOUD_KEY_LEN]>;
+pub struct CloudWrapKey(SecretVec<u8>);
+
+impl ExposeSecret<Vec<u8>> for CloudWrapKey {
+    fn expose_secret(&self) -> &Vec<u8> {
+        self.0.expose_secret()
+    }
+}
+
+impl CloudWrapKey {
+    pub fn new(secret: Vec<u8>) -> Option<Self> {
+        if secret.len() == CLOUD_KEY_LEN {
+            Some(Self(SecretVec::new(secret)))
+        } else {
+            None
+        }
+    }
+}
 
 /// Returned from the enclave app after keygen
 /// if the cloud backup option is requested.
@@ -84,6 +100,7 @@ pub type CloudWrapKey = Secret<[u8; CLOUD_KEY_LEN]>;
 pub struct CloudBackupKeyData {
     pub nonce: AesGcm128SivNonce,
     pub sealed_secret: Ciphertext,
+    pub public_key: ed25519_dalek::PublicKey,
 }
 
 /// configuration for direct remote communication with TM
@@ -106,7 +123,7 @@ pub struct RemoteConnectionConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SgxInitRequest {
     /// generate a new keypair
-    KeyGen { cloud_backup_key: bool },
+    KeyGen,
     /// reseal the keypair from a backup
     CloudRecover { key_data: CloudBackupKeyData },
     /// start the main loop for processing Tendermint privval requests
