@@ -9,6 +9,11 @@ use std::convert::TryInto;
 use tmkms_light_sgx_runner::{CloudBackupKeyData, CloudWrapKey, SealedKeyData};
 use zeroize::Zeroize;
 
+/// As cloud vendors may not guarantee HW affinity,
+/// this is optionally used to seal the keypair with the externally provided
+/// key (e.g. injected from cloud HSM) with `Aes128GcmSiv`.
+/// The payload encrypted with this key can then be used to recover
+/// when the instance is relocated etc.
 pub fn cloud_backup(
     csprng: &mut OsRng,
     seal_key: CloudWrapKey,
@@ -31,6 +36,8 @@ pub fn cloud_backup(
         })
 }
 
+/// Recovers the backed up keypair (decrypt it using the externally
+/// provided key, e.g. injected from cloud HSM) and seals it on that CPU.
 pub fn seal_recover_cloud_backup(
     csprng: &mut OsRng,
     seal_key: CloudWrapKey,
@@ -47,10 +54,8 @@ pub fn seal_recover_cloud_backup(
         drop(seal_key);
         let secret = SecretKey::from_bytes(&secret_key).map_err(|_| ErrorCode::InvalidSignature)?;
         secret_key.zeroize();
-        let mut kp = Keypair {
-            secret,
-            public: backup_data.public_key,
-        };
+        let public = PublicKey::from(&secret);
+        let mut kp = Keypair { secret, public };
         let sealed = seal(csprng, &kp);
         kp.secret.zeroize();
         sealed

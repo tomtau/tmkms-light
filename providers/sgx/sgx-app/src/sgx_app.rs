@@ -172,3 +172,89 @@ pub fn entry(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::RngCore;
+    use std::net::{TcpListener, TcpStream};
+    use tmkms_light::utils::read_u16_payload;
+
+    // can be run with `cargo test --target x86_64-fortanix-unknown-sgx`
+    #[test]
+    fn test_recover_flow() {
+        let mut csprng = OsRng {};
+        let mut backup_key = vec![0u8; 16];
+        csprng.fill_bytes(&mut backup_key);
+        let bk1 = CloudWrapKey::new(backup_key.clone()).unwrap();
+        let bk2 = CloudWrapKey::new(backup_key).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handler = std::thread::spawn(move || {
+            entry(
+                TcpStream::connect(addr).unwrap(),
+                SgxInitRequest::KeyGen,
+                Some(bk1),
+            )
+        });
+        let (mut stream_signer, _) = listener.accept().unwrap();
+        let resp1 = read_u16_payload(&mut stream_signer).expect("response1");
+        let response1: SgxInitResponse = serde_json::from_slice(&resp1).expect("response1");
+        let r1_seal = response1.sealed_key_data.clone();
+        let _ = handler.join();
+        let handler = std::thread::spawn(move || {
+            entry(
+                TcpStream::connect(addr).unwrap(),
+                SgxInitRequest::CloudRecover {
+                    key_data: response1.cloud_backup_key_data.expect("backup"),
+                },
+                Some(bk2),
+            )
+        });
+        let (mut stream_signer, _) = listener.accept().unwrap();
+        let resp2 = read_u16_payload(&mut stream_signer).expect("response2");
+        let response2: SgxInitResponse = serde_json::from_slice(&resp2).expect("response2");
+        let _ = handler.join();
+        assert_eq!(
+            r1_seal.seal_key_request.keyid,
+            response2.sealed_key_data.seal_key_request.keyid
+        );
+    }
+
+    #[test]
+    fn test_unseal() {
+        let mut csprng = OsRng {};
+        let kp = Keypair::generate(&mut csprng);
+        let sealed_data = keypair_seal::seal(&mut csprng, &kp).unwrap();
+        let mut mangled_sealed_data = sealed_data.clone();
+        mangled_sealed_data.nonce[0] ^= 1;
+        assert!(keypair_seal::unseal(&mangled_sealed_data).is_err());
+        assert_eq!(
+            keypair_seal::unseal(&sealed_data).unwrap().public,
+            kp.public
+        );
+    }
+
+    #[test]
+    fn test_recover() {
+        let mut csprng = OsRng {};
+        let kp = Keypair::generate(&mut csprng);
+        let sealed_data = keypair_seal::seal(&mut csprng, &kp).unwrap();
+        let mut backup_key = vec![0u8; 16];
+        csprng.fill_bytes(&mut backup_key);
+        let bk1 = CloudWrapKey::new(backup_key.clone()).unwrap();
+        let bk2 = CloudWrapKey::new(backup_key).unwrap();
+        let backup_data = keypair_seal::cloud_backup(&mut csprng, bk1, &kp).unwrap();
+        let recovered_sealed_data =
+            keypair_seal::seal_recover_cloud_backup(&mut csprng, bk2, backup_data).unwrap();
+        assert_eq!(
+            keypair_seal::unseal(&sealed_data).unwrap().public,
+            kp.public
+        );
+        assert_eq!(
+            keypair_seal::unseal(&recovered_sealed_data).unwrap().public,
+            kp.public
+        );
+    }
+}
