@@ -70,7 +70,7 @@ pub struct SealedKeyData {
 pub type PublicKey = [u8; 32];
 
 /// length of symmetric key wrap for cloud backup using e.g. cloud KMS
-const CLOUD_KEY_LEN: usize = 16;
+pub const CLOUD_KEY_LEN: usize = 16;
 
 /// symmetric key wrap -- e.g. from cloud KMS
 pub struct CloudWrapKey(SecretVec<u8>);
