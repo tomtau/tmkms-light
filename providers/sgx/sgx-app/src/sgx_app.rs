@@ -1,5 +1,5 @@
 /// helpers for keypair sealing/unsealing
-mod keypair_seal;
+pub(crate) mod keypair_seal;
 /// state persistence helper;
 mod state;
 use ed25519_dalek::Keypair;
@@ -9,11 +9,12 @@ use std::net::TcpStream;
 use std::thread;
 use std::time::Duration;
 use subtle::ConstantTimeEq;
+use keypair_seal::CloudWrapKey;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
 use tmkms_light::connection::{Connection, PlainConnection};
 use tmkms_light::utils::write_u16_payload;
 use tmkms_light_sgx_runner::RemoteConnectionConfig;
-use tmkms_light_sgx_runner::{CloudWrapKey, SgxInitRequest, SgxInitResponse};
+use tmkms_light_sgx_runner::{SgxInitRequest, SgxInitResponse};
 use tracing::{debug, error, info, warn};
 
 fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn Connection>> {

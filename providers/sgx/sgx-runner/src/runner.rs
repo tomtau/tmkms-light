@@ -2,24 +2,20 @@ use crate::shared::CloudBackupKeyData;
 use crate::shared::{RemoteConnectionConfig, SealedKeyData, SgxInitRequest, SgxInitResponse};
 use crate::state::StateSyncer;
 use aesm_client::AesmClient;
-use anomaly::format_err;
 use enclave_runner::{
     usercalls::{AsyncStream, UsercallExtension},
     EnclaveBuilder,
 };
 use sgxs_loaders::isgx::Device;
-use std::io::Read;
-use std::io::Write;
 use std::path::Path;
 use std::thread;
 use std::{fs, path::PathBuf};
 use std::{future::Future, io, pin::Pin};
-use std::{os::unix::net::UnixStream, time::Duration};
+use std::os::unix::net::UnixStream;
 use tendermint::consensus;
 use tendermint::net;
 use tmkms_light::config::validator::ValidatorConfig;
-use tmkms_light::error::{Error, ErrorKind::IoError};
-use tmkms_light::utils::{read_u16_payload, write_u16_payload};
+use tmkms_light::utils::read_u16_payload;
 use tracing::debug;
 
 /// type alias for outputs in UsercallExtension async return type
@@ -133,7 +129,6 @@ impl TmkmsSgxSigner {
                 self.enclave_app_thread.join().map_err(|_| ())?;
                 Ok((sealed_key_data, cloud_backup_key_data))
             }
-            _ => Err(()),
         }
     }
 

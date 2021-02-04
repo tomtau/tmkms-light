@@ -3,11 +3,31 @@ use aes_gcm_siv::Aes128GcmSiv;
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use secrecy::ExposeSecret;
+use secrecy::{SecretVec, ExposeSecret};
 use sgx_isa::{ErrorCode, Keyname, Keypolicy, Keyrequest, Report};
 use std::convert::TryInto;
-use tmkms_light_sgx_runner::{CloudBackupKeyData, CloudWrapKey, SealedKeyData};
+use tmkms_light_sgx_runner::{CloudBackupKeyData, SealedKeyData, CLOUD_KEY_LEN};
 use zeroize::Zeroize;
+
+/// symmetric key wrap -- e.g. from cloud KMS
+pub struct CloudWrapKey(SecretVec<u8>);
+
+impl ExposeSecret<Vec<u8>> for CloudWrapKey {
+    fn expose_secret(&self) -> &Vec<u8> {
+        self.0.expose_secret()
+    }
+}
+
+impl CloudWrapKey {
+    /// creteas the new wrapper if the length is correct
+    pub fn new(secret: Vec<u8>) -> Option<Self> {
+        if secret.len() == CLOUD_KEY_LEN {
+            Some(Self(SecretVec::new(secret)))
+        } else {
+            None
+        }
+    }
+}
 
 /// As cloud vendors may not guarantee HW affinity,
 /// this is optionally used to seal the keypair with the externally provided

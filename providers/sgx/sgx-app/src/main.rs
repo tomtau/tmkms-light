@@ -24,7 +24,7 @@ fn main() -> std::io::Result<()> {
     let cloud_key = if let Some(k) = mcloud_key {
         let decoded_vec = subtle_encoding::hex::decode(k)
             .map_err(|_e| std::io::Error::from(std::io::ErrorKind::Other))?;
-        tmkms_light_sgx_runner::CloudWrapKey::new(decoded_vec)
+            sgx_app::keypair_seal::CloudWrapKey::new(decoded_vec)
     } else {
         None
     };
