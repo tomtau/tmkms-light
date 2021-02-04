@@ -1,3 +1,4 @@
+use crate::shared::CloudBackupKeyData;
 use crate::shared::SealedKeyData;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
@@ -52,6 +53,25 @@ pub fn write_sealed_file<P: AsRef<Path>>(path: P, sealed_data: &SealedKeyData) -
         .and_then(|file| {
             serde_json::to_writer(file, sealed_data).map_err(|e| {
                 error!("failed to write sealed key: {:?}", e);
+                io::ErrorKind::Other.into()
+            })
+        })
+}
+
+/// write backup key data
+pub fn write_backup_file<P: AsRef<Path>>(
+    path: P,
+    sealed_data: &CloudBackupKeyData,
+) -> io::Result<()> {
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path.as_ref())
+        .and_then(|file| {
+            serde_json::to_writer(file, sealed_data).map_err(|e| {
+                error!("failed to write backup data: {:?}", e);
                 io::ErrorKind::Other.into()
             })
         })
