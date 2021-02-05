@@ -6,38 +6,48 @@ use tmkms_light::{
     config::validator::ValidatorConfig,
     utils::{print_pubkey, PubkeyDisplay},
 };
-use tracing::{debug, error};
+use tracing::debug;
 use zeroize::Zeroizing;
 
 use crate::{config, runner::TmkmsSgxSigner};
 
+/// write tmkms.toml + generate keys (sealed for machine CPU
+/// + backup if an external key is provided)
 pub fn init(
     config_path: Option<PathBuf>,
     pubkey_display: Option<PubkeyDisplay>,
     bech32_prefix: Option<String>,
     external_backup_key_path: Option<PathBuf>,
     key_backup_data_path: Option<PathBuf>,
-) {
+) -> Result<(), String> {
     let cp = config_path.unwrap_or("tmkms.toml".into());
     let config = config::SgxSignOpt::default();
-    let t = toml::to_string_pretty(&config).expect("config in toml");
-    fs::write(cp, t).expect("written config");
+    let t =
+        toml::to_string_pretty(&config).map_err(|e| format!("config to toml failed: {:?}", e))?;
+    fs::write(cp, t).map_err(|e| format!("failed to write a config: {:?}", e))?;
     fs::create_dir_all(
         config
             .sealed_consensus_key_path
             .parent()
-            .expect("not root dir"),
+            .ok_or_else(|| "cannot create a dir in a root directory".to_owned())?,
     )
-    .expect("create dirs for key storage");
-    fs::create_dir_all(config.state_file_path.parent().expect("not root dir"))
-        .expect("create dirs for key storage");
+    .map_err(|e| format!("failed to create dirs for key storage: {:?}", e))?;
+    fs::create_dir_all(
+        config
+            .state_file_path
+            .parent()
+            .ok_or_else(|| "cannot create a dir in a root directory".to_owned())?,
+    )
+    .map_err(|e| format!("failed to create dirs for state storage: {:?}", e))?;
     let request = SgxInitRequest::KeyGen;
-    let request_bytes = serde_json::to_vec(&request).expect("serde");
+    let request_bytes = serde_json::to_vec(&request)
+        .map_err(|e| format!("failed to convert request to json: {:?}", e))?;
     let backup_key = if let Some(bkp) = external_backup_key_path {
-        let key_bytes = Zeroizing::new(fs::read(bkp).expect("key"));
+        let key_bytes = Zeroizing::new(
+            fs::read(bkp).map_err(|e| format!("failed to read backup key: {:?}", e))?,
+        );
         if key_bytes.len() != CLOUD_KEY_LEN {
-            error!("incorrect backup key length");
-            std::process::exit(1);
+            return Err("incorrect backup key length".to_owned());
         }
         Some(Zeroizing::new(subtle_encoding::hex::encode(&*key_bytes)))
     } else {
@@ -56,17 +66,24 @@ pub fn init(
         state_stream,
         &enclave_args,
     )
-    .expect("runner");
+    .map_err(|e| format!("failed to launch the enclave app: {:?}", e))?;
     debug!("waiting for keygen");
-    let sealed_key = runner.keygen().expect("gen key");
-    config::write_sealed_file(config.sealed_consensus_key_path, &sealed_key.0).expect("write key");
-    let public_key = ed25519_dalek::PublicKey::from_bytes(&sealed_key.0.seal_key_request.keyid)
-        .expect("valid public key");
+    let sealed_key = runner
+        .get_init_response()
+        .map_err(|e| format!("failed to generate consensus key: {:?}", e))?;
+    config::write_sealed_file(
+        config.sealed_consensus_key_path,
+        &sealed_key.sealed_key_data,
+    )
+    .map_err(|e| format!("failed to write consensus key: {:?}", e))?;
+    let public_key =
+        ed25519_dalek::PublicKey::from_bytes(&sealed_key.sealed_key_data.seal_key_request.keyid)
+            .map_err(|e| format!("invalid keyid: {:?}", e))?;
     print_pubkey(bech32_prefix, pubkey_display, public_key);
     let base_backup_path = key_backup_data_path.unwrap_or("".into());
-    if let Some(bkp) = sealed_key.1 {
+    if let Some(bkp) = sealed_key.cloud_backup_key_data {
         config::write_backup_file(base_backup_path.join("consensus-key.backup"), &bkp)
-            .expect("write backup");
+            .map_err(|e| format!("failed to write consensus key backup: {:?}", e))?;
     }
     if let Some(id_path) = config.sealed_id_key_path {
         let (state_syncer, _, state_stream) =
@@ -79,24 +96,30 @@ pub fn init(
             state_stream,
             &enclave_args,
         )
-        .expect("runner");
-        let sealed_key = runner.keygen().expect("gen key");
-        config::write_sealed_file(id_path, &sealed_key.0).expect("write key");
-        if let Some(bkp) = sealed_key.1 {
+        .map_err(|e| format!("failed to launch the enclave app: {:?}", e))?;
+        let sealed_key = runner
+            .get_init_response()
+            .map_err(|e| format!("failed to generate id key: {:?}", e))?;
+        config::write_sealed_file(id_path, &sealed_key.sealed_key_data)
+            .map_err(|e| format!("failed to write id key: {:?}", e))?;
+        if let Some(bkp) = sealed_key.cloud_backup_key_data {
             config::write_backup_file(base_backup_path.join("id-key.backup"), &bkp)
-                .expect("write backup");
+                .map_err(|e| format!("failed to write id key backup: {:?}", e))?;
         }
     }
+    Ok(())
 }
 
-pub fn start(config_path: Option<PathBuf>) {
-    let cp = config_path.unwrap_or("tmkms.toml".into());
+/// startup the enclave with Unix socket pairs for retrieving state updates and persisting them on the host
+pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
+    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     if !cp.exists() {
-        error!("missing tmkms.toml file");
-        std::process::exit(1);
+        Err("missing tmkms.toml file".to_owned())
     } else {
-        let toml_string = fs::read_to_string(cp).expect("toml config file read");
-        let config: config::SgxSignOpt = toml::from_str(&toml_string).expect("configuration");
+        let toml_string = fs::read_to_string(cp)
+            .map_err(|e| format!("toml config file failed to read: {:?}", e))?;
+        let config: config::SgxSignOpt = toml::from_str(&toml_string)
+            .map_err(|e| format!("toml config file failed to parse: {:?}", e))?;
         let tm_conn = match &config.address {
             net::Address::Unix { path } => {
                 debug!(
@@ -124,7 +147,7 @@ pub fn start(config_path: Option<PathBuf>) {
             state,
             remote,
         )
-        .expect("start");
+        .map_err(|e| format!("failed to get enclave request: {:?}", e))?;
         let runner = TmkmsSgxSigner::launch_enclave_app(
             &config.enclave_path,
             tm_conn,
@@ -132,39 +155,53 @@ pub fn start(config_path: Option<PathBuf>) {
             state_stream,
             &[&start_request_bytes],
         )
-        .expect("runner");
-        runner.start().expect("request loop");
+        .map_err(|e| format!("failed to launch the enclave app: {:?}", e))?;
+        runner
+            .start()
+            .map_err(|e| format!("enclave running failed: {:?}", e))?;
+        Ok(())
     }
 }
 
+/// recover the previously backed up id/consensus key (e.g. in cloud settings where
+/// physical CPU-affinity isn't guaranteed)
 pub fn recover(
     config_path: Option<PathBuf>,
     pubkey_display: Option<PubkeyDisplay>,
     bech32_prefix: Option<String>,
     external_backup_key_path: PathBuf,
     key_backup_data_path: PathBuf,
-    show_pubkey: bool,
-) {
-    let cp = config_path.unwrap_or("tmkms.toml".into());
+    recover_consensus_key: bool,
+) -> Result<(), String> {
+    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     if !cp.exists() {
-        eprintln!("missing tmkms.toml file");
-        std::process::exit(1);
+        Err("missing tmkms.toml file".to_owned())
     } else {
-        let toml_string = fs::read_to_string(cp).expect("toml config file read");
-        let config: config::SgxSignOpt = toml::from_str(&toml_string).expect("configuration");
+        let toml_string = fs::read_to_string(cp)
+            .map_err(|e| format!("toml config file failed to read: {:?}", e))?;
+        let config: config::SgxSignOpt = toml::from_str(&toml_string)
+            .map_err(|e| format!("toml config file failed to parse: {:?}", e))?;
+        if !recover_consensus_key && config.sealed_id_key_path.is_none() {
+            return Err("empty id key path in config".to_owned());
+        }
         let backup_key = {
-            let key_bytes = Zeroizing::new(fs::read(external_backup_key_path).expect("key"));
+            let key_bytes = Zeroizing::new(
+                fs::read(external_backup_key_path)
+                    .map_err(|e| format!("failed to read backup key: {:?}", e))?,
+            );
             if key_bytes.len() != CLOUD_KEY_LEN {
-                eprintln!("incorrect backup key length");
-                std::process::exit(1);
+                return Err("incorrect backup key length".to_owned());
             }
             Zeroizing::new(subtle_encoding::hex::encode(&*key_bytes))
         };
-        let key_data =
-            serde_json::from_str(&fs::read_to_string(key_backup_data_path).expect("backup data"))
-                .expect("backup data parse");
+        let key_data = serde_json::from_str(
+            &fs::read_to_string(key_backup_data_path)
+                .map_err(|e| format!("failed to read backup data: {:?}", e))?,
+        )
+        .map_err(|e| format!("failed to parse backup data: {:?}", e))?;
         let request = SgxInitRequest::CloudRecover { key_data };
-        let request_bytes = serde_json::to_vec(&request).expect("serde");
+        let request_bytes = serde_json::to_vec(&request)
+            .map_err(|e| format!("failed to convert request to json: {:?}", e))?;
         debug!("launching enclave");
         let (state_syncer, _, state_stream) =
             TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
@@ -175,16 +212,29 @@ pub fn recover(
             state_stream,
             &[request_bytes.as_ref(), &*backup_key],
         )
-        .expect("runner");
+        .map_err(|e| format!("failed to launch the enclave app: {:?}", e))?;
         debug!("waiting for recover");
-        let sealed_key = runner.keygen().expect("gen key");
-        config::write_sealed_file(config.sealed_consensus_key_path, &sealed_key.0)
-            .expect("write key");
-        let public_key = ed25519_dalek::PublicKey::from_bytes(&sealed_key.0.seal_key_request.keyid)
-            .expect("valid public key");
-        if show_pubkey {
+        let sealed_key = runner
+            .get_init_response()
+            .map_err(|e| format!("failed to recover key: {:?}", e))?;
+        if recover_consensus_key {
+            config::write_sealed_file(
+                config.sealed_consensus_key_path,
+                &sealed_key.sealed_key_data,
+            )
+            .map_err(|e| format!("failed to write consensus key: {:?}", e))?;
+            let public_key = ed25519_dalek::PublicKey::from_bytes(
+                &sealed_key.sealed_key_data.seal_key_request.keyid,
+            )
+            .map_err(|e| format!("ivalid keyid: {:?}", e))?;
             println!("recovered key");
             print_pubkey(bech32_prefix, pubkey_display, public_key);
+        } else {
+            // checked above after config parsing
+            let id_path = config.sealed_id_key_path.unwrap();
+            config::write_sealed_file(id_path, &sealed_key.sealed_key_data)
+                .map_err(|e| format!("failed to write id key: {:?}", e))?;
         }
+        Ok(())
     }
 }

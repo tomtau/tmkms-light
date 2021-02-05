@@ -1,4 +1,3 @@
-use crate::shared::CloudBackupKeyData;
 use crate::shared::{RemoteConnectionConfig, SealedKeyData, SgxInitRequest, SgxInitResponse};
 use crate::state::StateSyncer;
 use aesm_client::AesmClient;
@@ -116,20 +115,13 @@ impl TmkmsSgxSigner {
         })
     }
 
-    /// generate a new keypair
-    pub fn keygen(mut self) -> Result<(SealedKeyData, Option<CloudBackupKeyData>), ()> {
+    /// get the response from the enclave via the init stream
+    pub fn get_init_response(mut self) -> Result<SgxInitResponse, ()> {
         debug!("waiting for response");
         let response_bytes = read_u16_payload(&mut self.stream_to_enclave).map_err(|_e| ())?;
         let resp: SgxInitResponse = serde_json::from_slice(&response_bytes).map_err(|_e| ())?; //format_err!(IoError, "error deserializing response: {}", e))?;
-        match resp {
-            SgxInitResponse {
-                sealed_key_data,
-                cloud_backup_key_data,
-            } => {
-                self.enclave_app_thread.join().map_err(|_| ())?;
-                Ok((sealed_key_data, cloud_backup_key_data))
-            }
-        }
+        self.enclave_app_thread.join().map_err(|_| ())?;
+        Ok(resp)
     }
 
     pub fn get_start_request_bytes<P: AsRef<Path>>(

@@ -8,7 +8,7 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tmkms_light::utils::PubkeyDisplay;
-use tracing::Level;
+use tracing::{error, Level};
 use tracing_subscriber::FmtSubscriber;
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -44,7 +44,7 @@ enum TmkmsLight {
         #[structopt(short)]
         key_backup_data_path: PathBuf,
         #[structopt(short)]
-        show_pubkey: bool,
+        recover_consensus_key: bool,
     },
     #[structopt(name = "start", about = "start tmkms process")]
     /// start tmkms process
@@ -61,7 +61,7 @@ fn main() {
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    match opt {
+    let result = match opt {
         TmkmsLight::Init {
             config_path,
             pubkey_display,
@@ -82,14 +82,18 @@ fn main() {
             bech32_prefix,
             external_backup_key_path,
             key_backup_data_path,
-            show_pubkey,
+            recover_consensus_key,
         } => command::recover(
             config_path,
             pubkey_display,
             bech32_prefix,
             external_backup_key_path,
             key_backup_data_path,
-            show_pubkey,
+            recover_consensus_key,
         ),
+    };
+    if let Err(e) = result {
+        error!("{}", e);
+        std::process::exit(1);
     }
 }
