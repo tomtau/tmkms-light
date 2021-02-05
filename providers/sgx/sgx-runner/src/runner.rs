@@ -7,11 +7,11 @@ use enclave_runner::{
     EnclaveBuilder,
 };
 use sgxs_loaders::isgx::Device;
+use std::os::unix::net::UnixStream;
 use std::path::Path;
 use std::thread;
 use std::{fs, path::PathBuf};
 use std::{future::Future, io, pin::Pin};
-use std::os::unix::net::UnixStream;
 use tendermint::consensus;
 use tendermint::net;
 use tmkms_light::config::validator::ValidatorConfig;

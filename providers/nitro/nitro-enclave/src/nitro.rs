@@ -40,7 +40,7 @@ fn get_secret_connection(
         )?;
     let actual_peer_id = connection.remote_pubkey().peer_id();
 
-    // TODO(tarcieri): move this into `SecretConnection::new`
+    // TODO: https://github.com/informalsystems/tendermint-rs/issues/786
     if let Some(expected_peer_id) = peer_id {
         if expected_peer_id.ct_eq(&actual_peer_id).unwrap_u8() == 0 {
             error!(
@@ -53,7 +53,7 @@ fn get_secret_connection(
     info!("connected to validator successfully");
 
     if peer_id.is_none() {
-        // TODO(tarcieri): make peer verification mandatory
+        // TODO: https://github.com/informalsystems/tendermint-rs/issues/786
         warn!(
             "unverified validator peer ID! ({})",
             connection.remote_pubkey().peer_id()

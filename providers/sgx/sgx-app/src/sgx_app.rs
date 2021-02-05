@@ -3,18 +3,18 @@ pub(crate) mod keypair_seal;
 /// state persistence helper;
 mod state;
 use ed25519_dalek::Keypair;
-use rand::rngs::OsRng;
-use std::io;
-use std::net::TcpStream;
-use std::thread;
-use std::time::Duration;
-use subtle::ConstantTimeEq;
 use keypair_seal::CloudWrapKey;
+use rand::rngs::OsRng;
+use std::{io, net::TcpStream, thread, time::Duration};
+use subtle::ConstantTimeEq;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
-use tmkms_light::connection::{Connection, PlainConnection};
-use tmkms_light::utils::write_u16_payload;
-use tmkms_light_sgx_runner::RemoteConnectionConfig;
-use tmkms_light_sgx_runner::{SgxInitRequest, SgxInitResponse};
+use tmkms_light::{
+    connection::{Connection, PlainConnection},
+    utils::write_u16_payload,
+};
+use tmkms_light_sgx_runner::{
+    RemoteConnectionConfig, {SgxInitRequest, SgxInitResponse},
+};
 use tracing::{debug, error, info, warn};
 
 fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn Connection>> {
@@ -25,6 +25,7 @@ fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn 
         sealed_key,
     } = config;
     let socket = TcpStream::connect(format!("{}:{}", host, port))?;
+    // TODO: just unseal once in the caller
     if let Ok(identity_key) = keypair_seal::unseal(&sealed_key) {
         info!("KMS node ID: {}", PublicKey::from(&identity_key));
 
@@ -36,7 +37,7 @@ fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn 
                 })?;
         let actual_peer_id = connection.remote_pubkey().peer_id();
 
-        // TODO(tarcieri): move this into `SecretConnection::new`
+        // TODO: https://github.com/informalsystems/tendermint-rs/issues/786
         if let Some(expected_peer_id) = peer_id {
             if expected_peer_id.ct_eq(&actual_peer_id).unwrap_u8() == 0 {
                 error!(
@@ -49,7 +50,7 @@ fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn 
         info!("connected to validator successfully");
 
         if peer_id.is_none() {
-            // TODO(tarcieri): make peer verification mandatory
+            // TODO: https://github.com/informalsystems/tendermint-rs/issues/786
             warn!(
                 "unverified validator peer ID! ({})",
                 connection.remote_pubkey().peer_id()
@@ -63,6 +64,8 @@ fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn 
     }
 }
 
+/// keeps retrying with approx. 1 sec sleep until it manages to connect to tendermint privval endpoint
+/// (either TCP or Unix socket exposed via "tendermint" usercall extension)
 pub fn get_connection(secret_connection: Option<&RemoteConnectionConfig>) -> Box<dyn Connection> {
     loop {
         let conn: io::Result<Box<dyn Connection>> = if let Some(config) = secret_connection {
@@ -83,10 +86,11 @@ pub fn get_connection(secret_connection: Option<&RemoteConnectionConfig>) -> Box
 }
 
 /// a simple req-rep handling loop
-/// `TcpStream` is either provided in tests or from the "signatory-sgx"
+/// `TcpStream` is either provided in tests or from the "init"
 /// enclave runner's user call extension.
+/// TODO: no need to pass the host_response stream + cloud_backup_key for "Start"
 pub fn entry(
-    mut signatory_signer: TcpStream,
+    mut host_response: TcpStream,
     request: SgxInitRequest,
     cloud_backup_key: Option<CloudWrapKey>,
 ) -> io::Result<()> {
@@ -104,7 +108,7 @@ pub fn entry(
                 match serde_json::to_vec(&response) {
                     Ok(v) => {
                         debug!("writing response");
-                        write_u16_payload(&mut signatory_signer, &v)?;
+                        write_u16_payload(&mut host_response, &v)?;
                     }
                     Err(e) => {
                         error!("keygen error: {}", e);
@@ -125,7 +129,7 @@ pub fn entry(
                 match serde_json::to_vec(&response) {
                     Ok(v) => {
                         debug!("writing response");
-                        write_u16_payload(&mut signatory_signer, &v)?;
+                        write_u16_payload(&mut host_response, &v)?;
                     }
                     Err(e) => {
                         error!("recovery error: {}", e);

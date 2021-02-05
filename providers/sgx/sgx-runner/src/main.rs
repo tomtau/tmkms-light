@@ -3,6 +3,7 @@ mod runner;
 mod shared;
 mod state;
 use runner::TmkmsSgxSigner;
+use shared::{SgxInitRequest, CLOUD_KEY_LEN};
 use std::fmt::Debug;
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
@@ -11,7 +12,6 @@ use tmkms_light::{
     config::validator::ValidatorConfig,
     utils::{print_pubkey, PubkeyDisplay},
 };
-use shared::{SgxInitRequest, CLOUD_KEY_LEN};
 use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
 use zeroize::Zeroizing;

@@ -1,9 +1,10 @@
-use aes_gcm_siv::aead::{generic_array::GenericArray, Aead, NewAead, Payload};
-use aes_gcm_siv::Aes128GcmSiv;
+use aes_gcm_siv::{
+    aead::{generic_array::GenericArray, Aead, NewAead, Payload},
+    Aes128GcmSiv,
+};
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
-use rand::rngs::OsRng;
-use rand::RngCore;
-use secrecy::{SecretVec, ExposeSecret};
+use rand::{rngs::OsRng, RngCore};
+use secrecy::{ExposeSecret, SecretVec};
 use sgx_isa::{ErrorCode, Keyname, Keypolicy, Keyrequest, Report};
 use std::convert::TryInto;
 use tmkms_light_sgx_runner::{CloudBackupKeyData, SealedKeyData, CLOUD_KEY_LEN};
@@ -19,7 +20,7 @@ impl ExposeSecret<Vec<u8>> for CloudWrapKey {
 }
 
 impl CloudWrapKey {
-    /// creteas the new wrapper if the length is correct
+    /// creates the new wrapper if the length is correct
     pub fn new(secret: Vec<u8>) -> Option<Self> {
         if secret.len() == CLOUD_KEY_LEN {
             Some(Self(SecretVec::new(secret)))
@@ -52,7 +53,7 @@ pub fn cloud_backup(
         .map(|sealed_secret| CloudBackupKeyData {
             sealed_secret,
             nonce,
-            public_key: keypair.public.clone(),
+            public_key: keypair.public,
         })
 }
 
