@@ -42,8 +42,7 @@ impl Default for SgxSignOpt {
     }
 }
 
-/// write sealed key data
-pub fn write_sealed_file<P: AsRef<Path>>(path: P, sealed_data: &SealedKeyData) -> io::Result<()> {
+fn write_json_file<P: AsRef<Path>, T: ?Sized + Serialize>(path: P, data: &T) -> io::Result<()> {
     OpenOptions::new()
         .create(true)
         .write(true)
@@ -51,11 +50,19 @@ pub fn write_sealed_file<P: AsRef<Path>>(path: P, sealed_data: &SealedKeyData) -
         .mode(0o600)
         .open(path.as_ref())
         .and_then(|file| {
-            serde_json::to_writer(file, sealed_data).map_err(|e| {
-                error!("failed to write sealed key: {:?}", e);
+            serde_json::to_writer(file, data).map_err(|e| {
+                error!(
+                    "failed to write key (backup or sealed) data payload: {:?}",
+                    e
+                );
                 io::ErrorKind::Other.into()
             })
         })
+}
+
+/// write sealed key data
+pub fn write_sealed_file<P: AsRef<Path>>(path: P, sealed_data: &SealedKeyData) -> io::Result<()> {
+    write_json_file(path, sealed_data)
 }
 
 /// write backup key data
@@ -63,16 +70,5 @@ pub fn write_backup_file<P: AsRef<Path>>(
     path: P,
     sealed_data: &CloudBackupKeyData,
 ) -> io::Result<()> {
-    OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path.as_ref())
-        .and_then(|file| {
-            serde_json::to_writer(file, sealed_data).map_err(|e| {
-                error!("failed to write backup data: {:?}", e);
-                io::ErrorKind::Other.into()
-            })
-        })
+    write_json_file(path, sealed_data)
 }

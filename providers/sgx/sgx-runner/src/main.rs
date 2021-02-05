@@ -16,7 +16,7 @@ use tracing_subscriber::FmtSubscriber;
     about = "runner for signing backend app using SGX"
 )]
 enum TmkmsLight {
-    #[structopt(name = "init", about = "Create config + keygen")]
+    #[structopt(name = "init", about = "Create config and generate keys")]
     /// Create config + keygen
     Init {
         #[structopt(short)]
@@ -46,7 +46,7 @@ enum TmkmsLight {
         #[structopt(short)]
         recover_consensus_key: bool,
     },
-    #[structopt(name = "start", about = "start tmkms process")]
+    #[structopt(name = "start", about = "Start tmkms process")]
     /// start tmkms process
     Start {
         #[structopt(short)]
