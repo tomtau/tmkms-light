@@ -70,7 +70,8 @@ impl StateSyncer {
     }
 
     /// Write the initial state to the given path on disk
-    fn write_initial_state(path: &PathBuf) -> Result<consensus::State, StateError> {
+    #[allow(clippy::field_reassign_with_default)]
+    fn write_initial_state(path: &Path) -> Result<consensus::State, StateError> {
         let mut consensus_state = consensus::State::default();
 
         // TODO(tarcieri): correct upstream `tendermint-rs` default height to 0
@@ -93,7 +94,7 @@ impl StateSyncer {
         });
     }
 
-    fn persist_state(path: &PathBuf, new_state: &consensus::State) -> Result<(), StateError> {
+    fn persist_state(path: &Path, new_state: &consensus::State) -> Result<(), StateError> {
         debug!(
             "writing new consensus state to {}: {:?}",
             path.display(),

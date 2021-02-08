@@ -1,6 +1,7 @@
 use crate::shared::{RemoteConnectionConfig, SealedKeyData, SgxInitRequest, SgxInitResponse};
 use crate::state::StateSyncer;
 use aesm_client::AesmClient;
+use anomaly::format_err;
 use enclave_runner::{
     usercalls::{AsyncStream, UsercallExtension},
     EnclaveBuilder,
@@ -14,8 +15,9 @@ use std::{future::Future, io, pin::Pin};
 use tendermint::consensus;
 use tendermint::net;
 use tmkms_light::config::validator::ValidatorConfig;
+use tmkms_light::error::{Error, ErrorKind};
 use tmkms_light::utils::read_u16_payload;
-use tracing::debug;
+use tracing::{debug, error};
 
 /// type alias for outputs in UsercallExtension async return type
 type UserCallStream = io::Result<Option<Box<dyn AsyncStream>>>;
@@ -64,17 +66,32 @@ impl UsercallExtension for TmkmsSgxRunner {
 /// controller for launching the enclave app and providing the communication with it
 pub struct TmkmsSgxSigner {
     stream_to_enclave: UnixStream,
-    enclave_app_thread: thread::JoinHandle<()>,
+    enclave_app_thread: thread::JoinHandle<Result<(), Error>>,
 }
 
 impl TmkmsSgxSigner {
+    /// returns the state persistence helper, the last persisted state,
+    /// and the unix socket to pass to the enclave runner
     pub fn get_state_syncer<P: AsRef<Path>>(
         state_path: P,
-    ) -> (StateSyncer, consensus::State, UnixStream) {
-        let (state_from_enclave, state_stream) = UnixStream::pair().expect("state pair");
+    ) -> Result<(StateSyncer, consensus::State, UnixStream), Error> {
+        let (state_from_enclave, state_stream) = UnixStream::pair().map_err(|e| {
+            format_err!(
+                ErrorKind::IoError,
+                "failed to get state unix socket pair {}",
+                e
+            )
+        })?;
+
         let (state_syncer, state) =
-            StateSyncer::new(state_path, state_from_enclave).expect("state syncer");
-        (state_syncer, state, state_stream)
+            StateSyncer::new(state_path, state_from_enclave).map_err(|e| {
+                format_err!(
+                    ErrorKind::IoError,
+                    "failed to get state persistence helper {}",
+                    e
+                )
+            })?;
+        Ok((state_syncer, state, state_stream))
     }
 
     /// launches the `tmkms-light-sgx-app` from the provided path
@@ -101,37 +118,60 @@ impl TmkmsSgxSigner {
         enclave_builder.usercall_extension(runner);
         enclave_builder.forward_panics(true);
         enclave_builder.args(args);
-        let enclave = enclave_builder
-            .build(&mut device)
-            .expect("Failed to build the enclave app");
-        let enclave_app_thread = thread::spawn(|| {
-            enclave
-                .run()
-                .expect("Failed to start `tmkms-sgx-app` enclave")
-        });
-        Ok(Self {
-            stream_to_enclave,
-            enclave_app_thread,
-        })
+        match enclave_builder.build(&mut device) {
+            Ok(enclave) => {
+                let enclave_app_thread = thread::spawn(|| {
+                    enclave.run().map_err(|e| {
+                        format_err!(ErrorKind::IoError, "enclave runner error: {:?}", e).into()
+                    })
+                });
+                Ok(Self {
+                    stream_to_enclave,
+                    enclave_app_thread,
+                })
+            }
+            Err(e) => {
+                error!("failed to build the enclave app: {:?}", e);
+                Err(io::ErrorKind::Other.into())
+            }
+        }
     }
 
     /// get the response from the enclave via the init stream
-    pub fn get_init_response(mut self) -> Result<SgxInitResponse, ()> {
+    pub fn get_init_response(mut self) -> Result<SgxInitResponse, Error> {
         debug!("waiting for response");
-        let response_bytes = read_u16_payload(&mut self.stream_to_enclave).map_err(|_e| ())?;
-        let resp: SgxInitResponse = serde_json::from_slice(&response_bytes).map_err(|_e| ())?; //format_err!(IoError, "error deserializing response: {}", e))?;
-        self.enclave_app_thread.join().map_err(|_| ())?;
+        let response_bytes = read_u16_payload(&mut self.stream_to_enclave)
+            .map_err(|e| format_err!(ErrorKind::IoError, "error reading response: {:?}", e))?;
+        let resp: SgxInitResponse = serde_json::from_slice(&response_bytes).map_err(|e| {
+            format_err!(ErrorKind::IoError, "error deserializing response: {:?}", e)
+        })?;
+        self.join_enclave_thread()?;
         Ok(resp)
     }
 
+    /// get the request payload that's passed as an argument to the enclave
+    /// to start up the tmkms handling
     pub fn get_start_request_bytes<P: AsRef<Path>>(
         sealed_key_path: P,
         config: ValidatorConfig,
         initial_state: consensus::State,
         remote_conn: Option<(net::Address, P)>,
-    ) -> Result<Vec<u8>, ()> {
+    ) -> Result<Vec<u8>, Error> {
         let sealed_key: SealedKeyData =
-            serde_json::from_slice(&fs::read(sealed_key_path).map_err(|_| ())?).map_err(|_| ())?;
+            serde_json::from_slice(&fs::read(sealed_key_path).map_err(|e| {
+                format_err!(
+                    ErrorKind::IoError,
+                    "error reading sealed consensus key: {:?}",
+                    e
+                )
+            })?)
+            .map_err(|e| {
+                format_err!(
+                    ErrorKind::IoError,
+                    "invalid sealed consensus key format: {:?}",
+                    e
+                )
+            })?;
         let secret_connection = match remote_conn {
             Some((
                 net::Address::Tcp {
@@ -142,7 +182,12 @@ impl TmkmsSgxSigner {
                 id_path,
             )) => {
                 let sealed_id_key: SealedKeyData =
-                    serde_json::from_slice(&fs::read(id_path).map_err(|_| ())?).map_err(|_| ())?;
+                    serde_json::from_slice(&fs::read(id_path).map_err(|e| {
+                        format_err!(ErrorKind::IoError, "error reading id sealed key: {:?}", e)
+                    })?)
+                    .map_err(|e| {
+                        format_err!(ErrorKind::IoError, "invalid sealed id key format: {:?}", e)
+                    })?;
                 Some(RemoteConnectionConfig {
                     peer_id,
                     host,
@@ -158,12 +203,26 @@ impl TmkmsSgxSigner {
             secret_connection,
             initial_state,
         })
-        .map_err(|_| ())?;
+        .map_err(|e| {
+            format_err!(
+                ErrorKind::IoError,
+                "failed to obtain the start request payload: {:?}",
+                e
+            )
+        })?;
         Ok(req_bytes)
     }
 
+    fn join_enclave_thread(self) -> Result<(), Error> {
+        match self.enclave_app_thread.join() {
+            Ok(Ok(_)) => Ok(()),
+            Err(e) => Err(format_err!(ErrorKind::IoError, "enclave thread error: {:?}", e).into()),
+            Ok(Err(e)) => Err(e),
+        }
+    }
+
     /// run the main privval handling
-    pub fn start(self) -> Result<(), ()> {
-        Ok(self.enclave_app_thread.join().map_err(|_| ())?)
+    pub fn start(self) -> Result<(), Error> {
+        self.join_enclave_thread()
     }
 }

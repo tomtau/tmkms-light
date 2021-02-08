@@ -20,7 +20,7 @@ pub fn init(
     external_backup_key_path: Option<PathBuf>,
     key_backup_data_path: Option<PathBuf>,
 ) -> Result<(), String> {
-    let cp = config_path.unwrap_or("tmkms.toml".into());
+    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     let config = config::SgxSignOpt::default();
     let t =
         toml::to_string_pretty(&config).map_err(|e| format!("config to toml failed: {:?}", e))?;
@@ -54,7 +54,8 @@ pub fn init(
         None
     };
     debug!("launching enclave");
-    let (state_syncer, _, state_stream) = TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
+    let (state_syncer, _, state_stream) = TmkmsSgxSigner::get_state_syncer(&config.state_file_path)
+        .map_err(|e| format!("state persistence error: {:?}", e))?;
     let mut enclave_args: Vec<&[u8]> = vec![request_bytes.as_ref()];
     if let Some(ref bkp) = backup_key {
         enclave_args.push(&*bkp);
@@ -80,14 +81,15 @@ pub fn init(
         ed25519_dalek::PublicKey::from_bytes(&sealed_key.sealed_key_data.seal_key_request.keyid)
             .map_err(|e| format!("invalid keyid: {:?}", e))?;
     print_pubkey(bech32_prefix, pubkey_display, public_key);
-    let base_backup_path = key_backup_data_path.unwrap_or("".into());
+    let base_backup_path = key_backup_data_path.unwrap_or_else(|| "".into());
     if let Some(bkp) = sealed_key.cloud_backup_key_data {
         config::write_backup_file(base_backup_path.join("consensus-key.backup"), &bkp)
             .map_err(|e| format!("failed to write consensus key backup: {:?}", e))?;
     }
     if let Some(id_path) = config.sealed_id_key_path {
         let (state_syncer, _, state_stream) =
-            TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
+            TmkmsSgxSigner::get_state_syncer(&config.state_file_path)
+                .map_err(|e| format!("state persistence error: {:?}", e))?;
 
         let runner = TmkmsSgxSigner::launch_enclave_app(
             &config.enclave_path,
@@ -137,7 +139,8 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
             None
         };
         let (state_syncer, state, state_stream) =
-            TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
+            TmkmsSgxSigner::get_state_syncer(&config.state_file_path)
+                .map_err(|e| format!("state persistence error: {:?}", e))?;
         let start_request_bytes = TmkmsSgxSigner::get_start_request_bytes(
             config.sealed_consensus_key_path,
             ValidatorConfig {
@@ -204,7 +207,8 @@ pub fn recover(
             .map_err(|e| format!("failed to convert request to json: {:?}", e))?;
         debug!("launching enclave");
         let (state_syncer, _, state_stream) =
-            TmkmsSgxSigner::get_state_syncer(&config.state_file_path);
+            TmkmsSgxSigner::get_state_syncer(&config.state_file_path)
+                .map_err(|e| format!("state persistence error: {:?}", e))?;
         let runner = TmkmsSgxSigner::launch_enclave_app(
             &config.enclave_path,
             None,
