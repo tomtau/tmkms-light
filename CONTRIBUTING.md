@@ -39,13 +39,13 @@ Once you identified an issue to work on, this is the summary of your basic steps
 
 * Include tests that cover all non-trivial code.
 
-* Check you are working on the latest version on master in Tendermint KMS Light's official repository. If not, please pull Tendermint KMS Light's official repository's master (upstream) into your fork's master branch, and rebase your committed changes or replay your stashed changes in your branch over the latest changes in the upstream version.
+* Check you are working on the latest version on main in Tendermint KMS Light's official repository. If not, please pull Tendermint KMS Light's official repository's main (upstream) into your fork's main branch, and rebase your committed changes or replay your stashed changes in your branch over the latest changes in the upstream version.
 
 * Run all tests locally and make sure they pass.
 
 * If your changes are of interest to other developers, please make corresponding changes in the official documentation and the changelog.
 
-* Push your changes to your fork's branch and open the pull request to Tendermint KMS Light's repository master branch.
+* Push your changes to your fork's branch and open the pull request to Tendermint KMS Light's repository main branch.
 
 * In the pull request, complete its checklist, add a clear description of the problem your changes solve, and add the following statement to confirm that your contribution is your own original work: "I hereby certify that my contribution is in accordance with the Developer Certificate of Origin (https://developercertificate.org/)."
 

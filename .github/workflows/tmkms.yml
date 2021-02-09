@@ -1,0 +1,102 @@
+name: tmkms
+
+on:
+  push:
+    branches: main
+  pull_request:
+    paths:
+      - "Cargo.*"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+          override: true
+          profile: minimal
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+          override: true
+          profile: minimal
+      - run: cargo clippy --all -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - tmkms-nitro-helper
+          - tmkms-light-sgx-runner
+          - tmkms-softsign
+        rust:
+          - nightly
+        target:
+          - x86_64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
+          override: true
+      - run: cargo build --target ${{ matrix.target }} -p ${{ matrix.crate }} --release
+  build-sgx:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        crate:
+          - tmkms-light-sgx-app
+        rust:
+          - nightly
+        target:
+          - x86_64-fortanix-unknown-sgx
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
+          override: true
+      - run: cargo build --target ${{ matrix.target }} -p ${{ matrix.crate }} --release
+  # TODO: add Dockerfile for building Nitro on CI 
+  # build-nitro:
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       crate:
+  #         - tmkms-nitro-enclave
+  #       rust:
+  #         - nightly
+  #       target:
+  #         - x86_64-unknown-linux-musl
+  #   steps:
+  #     - uses: actions/checkout@v1
+  #     - uses: actions-rs/toolchain@v1
+  #       with:
+  #         profile: minimal
+  #         toolchain: ${{ matrix.rust }}
+  #         target: ${{ matrix.target }}
+  #         override: true
+  #     - run: cargo build --target ${{ matrix.target }} -p ${{ matrix.crate }} --release
+

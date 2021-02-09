@@ -52,7 +52,7 @@ fn main() {
     let opt = TmkmsLight::from_args();
     match opt {
         TmkmsLight::Init { config_path } => {
-            let cp = config_path.unwrap_or("tmkms.toml".into());
+            let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
             let config = config::SoftSignOpt::default();
             let t = toml::to_string_pretty(&config).expect("config in toml");
             fs::write(cp, t).expect("written config");
@@ -68,7 +68,7 @@ fn main() {
                 .expect("create dirs for key storage");
         }
         TmkmsLight::Start { config_path } => {
-            let cp = config_path.unwrap_or("tmkms.toml".into());
+            let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
             if !cp.exists() {
                 eprintln!("missing tmkms.toml file");
                 std::process::exit(1);
@@ -99,10 +99,12 @@ fn main() {
                         /// Default timeout in seconds
                         const DEFAULT_TIMEOUT: u16 = 10;
 
-                        let identity_key_path = config.id_key_path.as_ref().expect(&format!(
-                            "config error: no `secret_key` for validator: {}:{}",
-                            host, port
-                        ));
+                        let identity_key_path = config.id_key_path.as_ref().unwrap_or_else(|| {
+                            panic!(
+                                "config error: no `secret_key` for validator: {}:{}",
+                                host, port
+                            )
+                        });
 
                         let identity_key = key_utils::load_base64_ed25519_key(identity_key_path)
                             .expect("id keypair");
@@ -192,7 +194,7 @@ fn main() {
             ptype,
             bech32_prefix,
         } => {
-            let cp = config_path.unwrap_or("tmkms.toml".into());
+            let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
             if !cp.exists() {
                 eprintln!("missing tmkms.toml file");
                 std::process::exit(1);
