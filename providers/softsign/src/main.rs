@@ -132,10 +132,10 @@ fn main() {
                         // TODO: https://github.com/informalsystems/tendermint-rs/issues/786
                         if let Some(expected_peer_id) = peer_id {
                             if expected_peer_id.ct_eq(&actual_peer_id).unwrap_u8() == 0 {
-                                panic!(format!(
+                                panic!(
                                     "{}:{}: validator peer ID mismatch! (expected {}, got {})",
                                     host, port, expected_peer_id, actual_peer_id
-                                ));
+                                );
                             }
                         }
                         info!(
