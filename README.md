@@ -1,6 +1,6 @@
 # Tendermint KMS Light 🔐
 
-TEE-based Key Management System for [Tendermint] validators.
+TEE-based Key Management System for [Tendermint](http://github.com/tendermint/tendermint/) validators.
 
 ## About
 
