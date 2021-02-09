@@ -1,4 +1,6 @@
 //! Remote Procedure Calls
+//! Copyright (c) 2018-2021 Iqlusion Inc. (licensed under the Apache License, Version 2.0)
+//! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
 use crate::error::{Error, ErrorKind};
 use anomaly::{fail, format_err};

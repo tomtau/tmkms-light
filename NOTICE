@@ -1,0 +1,9 @@
+Tendermint KMS Light
+Copyright 2021, Foris Limited ("Crypto.com"). 
+
+This project contains portions of code derived from the following libraries:
+
+* Tendermint KMS
+ * Copyright: Copyright (c) 2018-2021 Iqlusion Inc.
+ * License: Apache License 2.0
+ * Repository: https://github.com/iqlusioninc/tmkms
