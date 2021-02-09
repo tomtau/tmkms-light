@@ -71,11 +71,10 @@ impl StateSyncer {
 
     /// Write the initial state to the given path on disk
     fn write_initial_state(path: &PathBuf) -> Result<consensus::State, StateError> {
-        let mut consensus_state = consensus::State::default();
-
-        // TODO(tarcieri): correct upstream `tendermint-rs` default height to 0
-        // Set the initial block height to 0 to indicate we've never signed a block
-        consensus_state.height = 0u32.into();
+        let consensus_state = consensus::State {
+            height: 0u32.into(),
+            ..Default::default()
+        };
 
         Self::persist_state(path, &consensus_state)?;
 
