@@ -41,6 +41,20 @@ jobs:
           profile: minimal
       - run: cargo clippy --all -- -D warnings
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+      - name: Install cargo audit
+        run: cargo install cargo-audit
+      # TODO: unmaintained dependencies -- need to be fixed in upstream
+      - run: cargo audit --deny-warnings --ignore RUSTSEC-2020-0036 --ignore RUSTSEC-2020-0016--ignore RUSTSEC-2020-0056
+  
   build:
     runs-on: ubuntu-latest
     strategy:
