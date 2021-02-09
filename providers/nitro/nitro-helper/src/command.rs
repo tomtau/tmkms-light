@@ -23,7 +23,7 @@ pub fn init(
 ) -> Result<(), String> {
     let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     let config = NitroSignOpt {
-        aws_region: aws_region,
+        aws_region,
         ..Default::default()
     };
     let t = toml::to_string_pretty(&config)
