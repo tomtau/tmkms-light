@@ -5,7 +5,7 @@ TEE-based Key Management System for [Tendermint](http://github.com/tendermint/te
 ## About
 
 This repository contains `tmkms-light`, a key management service intended to be deployed
-in conjunction with [Tendermint] applications (ideally on separate physical hosts).
+in conjunction with [Tendermint](http://github.com/tendermint/tendermint/) applications (ideally on separate physical hosts).
 The code is based on the [tmkms](https://github.com/iqlusioninc/tmkms) repository with the following differences:
 
 - **Smaller codebase** with the following limitations:
