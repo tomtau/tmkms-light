@@ -70,7 +70,7 @@ impl StateSyncer {
     }
 
     /// Write the initial state to the given path on disk
-    fn write_initial_state(path: &PathBuf) -> Result<consensus::State, StateError> {
+    fn write_initial_state(path: &Path) -> Result<consensus::State, StateError> {
         let consensus_state = consensus::State {
             height: 0u32.into(),
             ..Default::default()
@@ -145,7 +145,7 @@ impl StateSyncer {
     }
 
     /// write the new state into a file on the host
-    fn persist_state(path: &PathBuf, new_state: &consensus::State) -> Result<(), StateError> {
+    fn persist_state(path: &Path, new_state: &consensus::State) -> Result<(), StateError> {
         debug!(
             "writing new consensus state to {}: {:?}",
             path.display(),

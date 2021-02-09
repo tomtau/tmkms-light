@@ -102,10 +102,7 @@ fn transfer(src: &mut dyn Read, dst: &mut dyn Write) -> bool {
     let mut buffer = [0u8; BUFF_SIZE];
 
     let nbytes = src.read(&mut buffer);
-    let nbytes = match nbytes {
-        Err(_) => 0,
-        Ok(n) => n,
-    };
+    let nbytes = nbytes.unwrap_or(0);
 
     if nbytes == 0 {
         return true;

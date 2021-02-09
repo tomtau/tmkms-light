@@ -22,8 +22,10 @@ pub fn init(
     kms_key_id: String,
 ) -> Result<(), String> {
     let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
-    let mut config = NitroSignOpt::default();
-    config.aws_region = aws_region;
+    let config = NitroSignOpt {
+        aws_region: aws_region,
+        ..Default::default()
+    };
     let t = toml::to_string_pretty(&config)
         .map_err(|e| format!("failed to create a config in toml: {:?}", e))?;
     fs::write(cp, t).map_err(|e| format!("failed to write a config: {:?}", e))?;
