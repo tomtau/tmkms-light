@@ -6,6 +6,8 @@ use ed25519_dalek as ed25519;
 use nix::sys::socket::SockAddr;
 use std::io;
 use std::os::unix::io::AsRawFd;
+use std::thread;
+use std::time::Duration;
 use subtle::ConstantTimeEq;
 use tendermint::node::Id;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
@@ -24,12 +26,12 @@ use zeroize::Zeroizing;
 
 fn get_secret_connection(
     vsock_port: u32,
-    identity_key: ed25519::Keypair,
+    identity_key: &ed25519::Keypair,
     peer_id: Option<Id>,
 ) -> io::Result<Box<dyn Connection>> {
     let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
     let socket = vsock::VsockStream::connect(&addr)?;
-    info!("KMS node ID: {}", PublicKey::from(&identity_key));
+    info!("KMS node ID: {}", PublicKey::from(identity_key));
 
     let connection =
         SecretConnection::new(socket, &identity_key, secret_connection::Version::V0_34).map_err(
@@ -63,6 +65,38 @@ fn get_secret_connection(
     Ok(Box::new(connection))
 }
 
+/// keeps retrying with approx. 1 sec sleep until it manages to connect to tendermint privval endpoint
+pub fn get_connection(
+    config: &NitroConfig,
+    id_keypair: Option<&ed25519::Keypair>,
+) -> Box<dyn Connection> {
+    loop {
+        let conn: io::Result<Box<dyn Connection>> = if let Some(ref ikp) = id_keypair {
+            get_secret_connection(config.enclave_tendermint_conn, ikp, config.peer_id)
+        } else {
+            let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);
+            if let Ok(socket) = vsock::VsockStream::connect(&addr) {
+                trace!("tendermint vsock port: {}", config.enclave_tendermint_conn);
+                trace!("tendermint peer addr: {:?}", socket.peer_addr());
+                trace!("tendermint local addr: {:?}", socket.local_addr());
+                trace!("tendermint fd: {}", socket.as_raw_fd());
+                info!("connected to validator successfully");
+                let plain_conn = PlainConnection::new(socket);
+                Ok(Box::new(plain_conn))
+            } else {
+                warn!("vsock failed to connect to validator");
+                Err(io::ErrorKind::Other.into())
+            }
+        };
+        if let Err(e) = conn {
+            error!("tendermint connection error {:?}", e);
+            thread::sleep(Duration::new(1, 0));
+        } else {
+            return conn.unwrap();
+        }
+    }
+}
+
 /// a simple req-rep handling loop
 pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
     let json_raw = read_u16_payload(&mut config_stream)
@@ -81,68 +115,54 @@ pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
                 )
                 .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
             );
+            let secret = ed25519::SecretKey::from_bytes(&*key_bytes)
+                .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
+            let public = ed25519::PublicKey::from(&secret);
+            let keypair = ed25519::Keypair { secret, public };
+            let id_keypair = if let Some(ref ciphertext) = config.sealed_id_key {
+                let id_key_bytes = Zeroizing::new(
+                    aws_ne_sys::kms_decrypt(
+                        config.aws_region.as_bytes(),
+                        config.credentials.aws_key_id.as_bytes(),
+                        config.credentials.aws_secret_key.as_bytes(),
+                        config.credentials.aws_session_token.as_bytes(),
+                        ciphertext.as_ref(),
+                    )
+                    .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
+                );
+                let id_secret = ed25519::SecretKey::from_bytes(&*id_key_bytes)
+                    .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
+                let id_public = ed25519::PublicKey::from(&id_secret);
+                let id_keypair = ed25519::Keypair {
+                    secret: id_secret,
+                    public: id_public,
+                };
+                Some(id_keypair)
+            } else {
+                None
+            };
+            let mut state_holder = state::StateHolder::new(config.enclave_state_port)
+                .map_err(|_e| format_err!(IoError, "failed get state connection"))?;
+            let state = state_holder
+                .load_state()
+                .map_err(|_e| format_err!(IoError, "failed to load initial state"))?;
+            let conn: Box<dyn Connection> = get_connection(&config, id_keypair.as_ref());
+            let mut session = tmkms_light::session::Session::new(
+                ValidatorConfig {
+                    chain_id: config.chain_id.clone(),
+                    max_height: config.max_height,
+                },
+                conn,
+                keypair,
+                state,
+                state_holder,
+            );
             loop {
-                let mut state_holder = state::StateHolder::new(config.enclave_state_port)
-                    .map_err(|_e| format_err!(IoError, "failed get state connection"))?;
-                if let Ok(state) = state_holder.load_state() {
-                    let secret = ed25519::SecretKey::from_bytes(&*key_bytes)
-                        .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
-                    let public = ed25519::PublicKey::from(&secret);
-                    let keypair = ed25519::Keypair { secret, public };
-
-                    let conn: Box<dyn Connection> = if let Some(ref ciphertext) =
-                        config.sealed_id_key
-                    {
-                        let id_key_bytes = Zeroizing::new(
-                            aws_ne_sys::kms_decrypt(
-                                config.aws_region.as_bytes(),
-                                config.credentials.aws_key_id.as_bytes(),
-                                config.credentials.aws_secret_key.as_bytes(),
-                                config.credentials.aws_session_token.as_bytes(),
-                                ciphertext.as_ref(),
-                            )
-                            .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
-                        );
-                        let id_secret = ed25519::SecretKey::from_bytes(&*id_key_bytes)
-                            .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
-                        let id_public = ed25519::PublicKey::from(&id_secret);
-                        let id_keypair = ed25519::Keypair {
-                            secret: id_secret,
-                            public: id_public,
-                        };
-                        get_secret_connection(
-                            config.enclave_tendermint_conn,
-                            id_keypair,
-                            config.peer_id,
-                        )
-                        .map_err(|_e| format_err!(IoError, "failed get tendermint connection"))?
-                    } else {
-                        let addr =
-                            SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);
-                        let socket = vsock::VsockStream::connect(&addr)
-                            .map_err(|_e| format_err!(IoError, "failed get privval connection"))?;
-                        trace!("tendermint vsock port: {}", config.enclave_tendermint_conn);
-                        trace!("tendermint peer addr: {:?}", socket.peer_addr());
-                        trace!("tendermint local addr: {:?}", socket.local_addr());
-                        trace!("tendermint fd: {}", socket.as_raw_fd());
-                        info!("connected to validator successfully");
-                        let plain_conn = PlainConnection::new(socket);
-                        Box::new(plain_conn)
-                    };
-                    let mut session = tmkms_light::session::Session::new(
-                        ValidatorConfig {
-                            chain_id: config.chain_id.clone(),
-                            max_height: config.max_height,
-                        },
-                        conn,
-                        keypair,
-                        state,
-                        state_holder,
-                    );
-                    if let Err(e) = session.request_loop() {
-                        error!("request error: {}", e);
-                    }
+                if let Err(e) = session.request_loop() {
+                    error!("request error: {}", e);
                 }
+                let conn: Box<dyn Connection> = get_connection(&config, id_keypair.as_ref());
+                session.reset_connection(conn);
             }
         }
         Err(e) => {
