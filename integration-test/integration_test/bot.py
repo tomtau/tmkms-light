@@ -7,7 +7,7 @@ import subprocess
 import json
 
 class CLI:
-    def prepare(self, tendermint=None, tmkms=None, tmhome=None, kmsconfig=None):
+    def prepare(self, tendermint="tendermint", tmkms="tmkms-softsign", tmhome=".tendermint", kmsconfig="tmkms.toml"):
         '''Prepare tendermint node with tmkms executable
         :param tendermint: Path of tendermint, [default: tendermint]
         :param tmkms: Path of tmkms-light, [default: tmkms-softsign]
