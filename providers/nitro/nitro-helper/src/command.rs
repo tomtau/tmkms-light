@@ -135,7 +135,7 @@ pub fn start(config_path: Option<PathBuf>, cid: Option<u32>) -> Result<(), Strin
         };
         let addr = if let Some(cid) = cid {
             SockAddr::new_vsock(cid, config.enclave_config_port)
-        }else{
+        } else {
             SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port)
         };
         let mut socket = vsock::VsockStream::connect(&addr).map_err(|e| {
