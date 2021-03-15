@@ -19,6 +19,8 @@ pub struct SoftSignOpt {
     pub state_file_path: PathBuf,
     /// Optional timeout value in seconds
     pub timeout: Option<u16>,
+    /// Retry connection
+    pub retry: bool,
 }
 
 impl Default for SoftSignOpt {
@@ -33,6 +35,7 @@ impl Default for SoftSignOpt {
             id_key_path: Some("secrets/id.key".into()),
             state_file_path: "state/priv_validator_state.json".into(),
             timeout: None,
+            retry: true,
         }
     }
 }
