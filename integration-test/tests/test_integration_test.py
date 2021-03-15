@@ -26,6 +26,8 @@ def test_basic():
                 tmkms_output = tmkms_proc.stdout.readlines()
                 tmkms_err = tmkms_proc.stderr.readlines()
                 raise TimeoutError('Waited too long for the RPC port. tm: {}, tmkms: {} {}'.format(tm_output, tmkms_output, tmkms_err)) from e
+    time.sleep(5)
+    contents = urllib.request.urlopen("http://127.0.0.1:26657/status").read()
     status = json.loads(contents)
     block_height = int(status["result"]["sync_info"]["latest_block_height"])
     # TODO: verify validator address / key matches tmkms one
