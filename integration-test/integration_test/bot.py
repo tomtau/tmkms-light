@@ -20,7 +20,7 @@ class CLI:
         tmhome = tmhome if tmhome else ".tendermint"
         kmsconfig = kmsconfig if kmsconfig else "tmkms.toml"
         chainid = "testchain-1"
-        privsock = "unix:///tmp/test.socket"
+        privsock = "unix://test.socket"
         tm_config = tmhome + "/config/config.toml"
         genesis_path = tmhome + "/config/genesis.json"
 

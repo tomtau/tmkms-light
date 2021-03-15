@@ -109,9 +109,14 @@ fn main() {
                         let identity_key = key_utils::load_base64_ed25519_key(identity_key_path)
                             .expect("id keypair");
                         info!("KMS node ID: {}", PublicKey::from(&identity_key));
-
-                        let socket = TcpStream::connect(format!("{}:{}", host, port))
-                            .expect("tcp connection");
+                        let mut msocket;
+                        loop {
+                            msocket = TcpStream::connect(format!("{}:{}", host, port)).ok();
+                            if msocket.is_some() || !config.retry {
+                                break;
+                            }
+                        }
+                        let socket = msocket.expect("tcp connection");
                         let timeout =
                             Duration::from_secs(config.timeout.unwrap_or(DEFAULT_TIMEOUT).into());
                         socket
@@ -164,8 +169,14 @@ fn main() {
                             "{}: Connecting to socket at {}...",
                             &config.chain_id, &config.address
                         );
-
-                        let socket = UnixStream::connect(path).expect("unix socket open");
+                        let mut msocket;
+                        loop {
+                            msocket = UnixStream::connect(path).ok();
+                            if msocket.is_some() || !config.retry {
+                                break;
+                            }
+                        }
+                        let socket = msocket.expect("unix socket open");
                         let conn = PlainConnection::new(socket);
 
                         info!(

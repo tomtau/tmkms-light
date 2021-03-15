@@ -78,6 +78,14 @@ jobs:
           target: ${{ matrix.target }}
           override: true
       - run: cargo build --target ${{ matrix.target }} -p ${{ matrix.crate }} --release
+      - name: 'Tar files'
+        run: cd target/release/ && tar -cvf tmkms-softsign.tar tmkms-softsign && cd ../..
+        if: ${{ matrix.crate }} == 'tmkms-softsign'
+      - uses: actions/upload-artifact@v2
+        if: ${{ matrix.crate }} == 'tmkms-softsign'
+        with:
+          name: tmkms-softsign
+          path: target/release/tmkms-softsign.tar
   build-sgx:
     runs-on: ubuntu-latest
     strategy:
@@ -109,3 +117,18 @@ jobs:
           file: Dockerfile.nitro
           build-args: |
             RUST_TOOLCHAIN=1.50.0
+  run-integration-tests:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v1
+      - uses: cachix/install-nix-action@v12
+      - uses: cachix/cachix-action@v8
+        with:
+          name: crypto-com
+          skipPush: true
+      - uses: actions/download-artifact@v2
+        with:
+          name: tmkms-softsign
+          path: integration-test
+      - run: cd integration-test && tar -xvf tmkms-softsign.tar && chmod +x tmkms-softsign && ./run.sh
