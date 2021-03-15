@@ -1,4 +1,5 @@
 #! /usr/bin/env nix-shell
+#!nix-shell -i bash 
 
 cp ../target/debug/tmkms-softsign .
 chmod +x tmkms-softsign
