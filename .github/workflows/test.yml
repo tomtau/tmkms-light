@@ -1,0 +1,29 @@
+name: test
+
+on:
+  push:
+    branches: fix/ci-integration-test
+  pull_request:
+    paths:
+      - "Cargo.*"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  run-integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: cachix/install-nix-action@v12
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install protobuf-compiler
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+          override: true
+      - run: cargo build -p tmkms-softsign
+      - run: cd integration-test && ./run.sh
