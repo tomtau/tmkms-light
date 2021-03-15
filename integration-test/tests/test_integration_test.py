@@ -22,6 +22,10 @@ def test_basic():
         except Exception as e:
             time.sleep(1)
             if time.perf_counter() - start_time >= timeout:
+                tm_output = tm_proc.stdout.readlines()
+                tmkms_output = tmkms_proc.stdout.readlines()
+                print(str(tm_output))
+                print(str(tmkms_output))
                 raise TimeoutError('Waited too long for the RPC port') from e
     status = json.loads(contents)
     block_height = int(status["result"]["sync_info"]["latest_block_height"])
