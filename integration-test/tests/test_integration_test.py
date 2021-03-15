@@ -19,7 +19,7 @@ def test_basic():
         try:
             contents = urllib.request.urlopen("http://127.0.0.1:26657/status").read()
             break
-        except e:
+        except Exception as e:
             time.sleep(1)
             if time.perf_counter() - start_time >= timeout:
                 raise TimeoutError('Waited too long for the RPC port') from e
