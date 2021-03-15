@@ -3,6 +3,7 @@ import os
 import subprocess
 import urllib.request
 import json
+import time
 
 def test_basic():
     tm = os.getenv('TENDERMINT')
@@ -11,7 +12,17 @@ def test_basic():
     kmsconfig = os.getenv('TMKMSCONFIG')
     tmkms_proc = subprocess.Popen([tmkms, "start", "-c",  kmsconfig], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     tm_proc = subprocess.Popen([tm, "node", "--home",  tmhome], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    contents = urllib.request.urlopen("http://127.0.0.1:26657/status").read()
+    contents = None
+    start_time = time.perf_counter()
+    timeout = 30
+    while True:
+        try:
+            contents = urllib.request.urlopen("http://127.0.0.1:26657/status").read()
+            break
+        except e:
+            time.sleep(1)
+            if time.perf_counter() - start_time >= timeout:
+                raise TimeoutError('Waited too long for the RPC port') from e
     status = json.loads(contents)
     block_height = int(status["result"]["sync_info"]["latest_block_height"])
     # TODO: verify validator address / key matches tmkms one
