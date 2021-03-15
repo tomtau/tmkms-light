@@ -11,7 +11,7 @@ def test_basic():
     kmsconfig = os.getenv('TMKMSCONFIG')
     tmkms_proc = subprocess.Popen([tmkms, "start", "-c",  kmsconfig], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     tm_proc = subprocess.Popen([tm, "node", "--home",  tmhome], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    contents = urllib.request.urlopen("http://localhost:26657/status").read()
+    contents = urllib.request.urlopen("http://127.0.0.1:26657/status").read()
     status = json.loads(contents)
     block_height = int(status["result"]["sync_info"]["latest_block_height"])
     # TODO: verify validator address / key matches tmkms one
