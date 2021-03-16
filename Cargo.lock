@@ -161,9 +161,9 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "aws-ne-sys"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a57973cbd07397d42b7a4ad6f9e808b54bbbed4a75684e20b8f3255b9fcd2f59"
+checksum = "b4e4c3d6e113c20ac8f6f05677d88617f542a72a117c7044d8a63896c01a8a3b"
 
 [[package]]
 name = "backtrace"
