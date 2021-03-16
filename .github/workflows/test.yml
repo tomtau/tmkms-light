@@ -12,15 +12,9 @@ env:
   RUSTFLAGS: -Dwarnings
 
 jobs:
-  run-integration-tests:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
-      - uses: cachix/install-nix-action@v12
-      - uses: cachix/cachix-action@v8
-        with:
-          name: crypto-com
-          skipPush: true
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install protobuf-compiler
       - uses: actions-rs/toolchain@v1
@@ -29,5 +23,23 @@ jobs:
           toolchain: stable
           target: x86_64-unknown-linux-gnu
           override: true
-      - run: cargo build -p tmkms-softsign
+      - run: cargo build -p tmkms-softsign --release
+      - uses: actions/upload-artifact@v2
+        with:
+          name: tmkms-softsign
+          path: target/release/tmkms-softsign
+  run-integration-tests:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v1
+      - uses: cachix/install-nix-action@v12
+      - uses: cachix/cachix-action@v8
+        with:
+          name: crypto-com
+          skipPush: true
+      - uses: actions/download-artifact@v2
+        with:
+          name: tmkms-softsign
+          path: integration-test/tmkms-softsign
       - run: cd integration-test && ./run.sh
