@@ -85,7 +85,7 @@ jobs:
         if: ${{ matrix.crate }} == 'tmkms-softsign'
         with:
           name: tmkms-softsign
-          path: tmkms-softsign.tar
+          path: target/x86_64-unknown-linux-gnu/release/tmkms-softsign.tar
   build-sgx:
     runs-on: ubuntu-latest
     strategy:
