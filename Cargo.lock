@@ -2422,7 +2422,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-light"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anomaly",
  "ed25519-dalek",
@@ -2438,7 +2438,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-light-sgx-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aes-gcm-siv",
  "anomaly",
@@ -2459,7 +2459,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-light-sgx-runner"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aesm-client",
  "anomaly",
@@ -2486,7 +2486,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-nitro-enclave"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anomaly",
  "aws-ne-sys",
@@ -2506,7 +2506,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-nitro-helper"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anomaly",
  "bytes 0.5.6",
@@ -2537,7 +2537,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-softsign"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anomaly",
  "ed25519-dalek",
