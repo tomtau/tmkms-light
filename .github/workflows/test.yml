@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: tmkms-softsign
-          path: tmkms-softsign.tar
+          path: target/release/tmkms-softsign.tar
   run-integration-tests:
     runs-on: ubuntu-latest
     needs: build
