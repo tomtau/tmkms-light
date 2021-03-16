@@ -43,4 +43,4 @@ jobs:
         with:
           name: tmkms-softsign
           path: integration-test/tmkms-softsign
-      - run: cd integration-test && sudo chmod +x tmkms-softsign && ./run.sh
+      - run: cd integration-test && sudo chown -R $(id -u):$(id -g) tmkms-softsign && chmod +x tmkms-softsign && ./run.sh
