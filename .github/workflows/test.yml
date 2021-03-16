@@ -44,5 +44,5 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: tmkms-softsign
-          path: integration-test/tmkms-softsign.tar
-      - run: cd integration-test && tar -xvf tmkms-softsign.tar && chmod +x tmkms-softsign && ./run.sh
+          path: integration-test/tar
+      - run: cd integration-test && mv tar/tmkms-softsign . && chmod +x tmkms-softsign && ./run.sh
