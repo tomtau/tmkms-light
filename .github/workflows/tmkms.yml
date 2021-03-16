@@ -79,13 +79,13 @@ jobs:
           override: true
       - run: cargo build --target ${{ matrix.target }} -p ${{ matrix.crate }} --release
       - name: 'Tar files'
-        run: cd target/release/ && tar -cvf tmkms-softsign.tar tmkms-softsign && cd ../..
+        run: cd target/x86_64-unknown-linux-gnu/release/ && tar -cvf tmkms-softsign.tar tmkms-softsign
         if: ${{ matrix.crate }} == 'tmkms-softsign'
       - uses: actions/upload-artifact@v2
         if: ${{ matrix.crate }} == 'tmkms-softsign'
         with:
           name: tmkms-softsign
-          path: target/release/tmkms-softsign.tar
+          path: tmkms-softsign.tar
   build-sgx:
     runs-on: ubuntu-latest
     strategy:
