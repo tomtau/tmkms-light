@@ -1,3 +1,7 @@
+*March 18, 2021*
+Tendermint-rs and prost dependencies upgraded.
+## v0.1.2
+
 *March 16, 2021*
 The same as the initial released version, but with a few dependency upgrades
 ## v0.1.1
