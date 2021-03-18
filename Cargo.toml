@@ -9,12 +9,12 @@ edition = "2018"
 [dependencies]
 anomaly = "0.2"
 ed25519-dalek = "1"
-prost = "0.6"
+prost = "0.7"
 serde = { version = "1", features = ["serde_derive"] }
 subtle-encoding = { version = "0.5", features = ["bech32-preview"] }
-tendermint = { version = "0.17" }
-tendermint-proto = "0.17"
-tendermint-p2p = { version = "0.17" }
+tendermint = { version = "0.18" }
+tendermint-proto = "0.18"
+tendermint-p2p = { version = "0.18" }
 thiserror = "1"
 tracing = "0.1"
 
