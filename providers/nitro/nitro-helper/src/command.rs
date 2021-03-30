@@ -65,11 +65,10 @@ pub fn start(config_path: Option<PathBuf>, cid: Option<u32>) -> Result<(), Strin
     } else {
         let mut system = sysinfo::System::new_all();
         system.refresh_all();
-        if system
+        if !system
             .get_processes()
             .iter()
-            .find(|(_pid, p)| p.name() == "vsock-proxy")
-            .is_none()
+            .any(|(_pid, p)| p.name() == "vsock-proxy")
         {
             return Err("vsock-proxy not running".to_owned());
         }
