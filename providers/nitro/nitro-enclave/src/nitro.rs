@@ -32,14 +32,14 @@ fn get_secret_connection(
     let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
     let socket = vsock::VsockStream::connect(&addr)?;
     info!("KMS node ID: {}", PublicKey::from(identity_key));
-
-    let connection =
-        SecretConnection::new(socket, &identity_key, secret_connection::Version::V0_34).map_err(
-            |e| {
-                error!("secret connection failed: {}", e);
-                io::Error::from(io::ErrorKind::Other)
-            },
-        )?;
+    // the `Clone` is not derived for Keypair
+    // TODO: https://github.com/dalek-cryptography/ed25519-dalek/issues/76
+    let identity_key = ed25519::Keypair::from_bytes(&identity_key.to_bytes()).unwrap();
+    let connection = SecretConnection::new(socket, identity_key, secret_connection::Version::V0_34)
+        .map_err(|e| {
+            error!("secret connection failed: {}", e);
+            io::Error::from(io::ErrorKind::Other)
+        })?;
     let actual_peer_id = connection.remote_pubkey().peer_id();
 
     // TODO: https://github.com/informalsystems/tendermint-rs/issues/786
@@ -71,7 +71,7 @@ pub fn get_connection(
     id_keypair: Option<&ed25519::Keypair>,
 ) -> Box<dyn Connection> {
     loop {
-        let conn: io::Result<Box<dyn Connection>> = if let Some(ref ikp) = id_keypair {
+        let conn: io::Result<Box<dyn Connection>> = if let Some(ikp) = id_keypair {
             get_secret_connection(config.enclave_tendermint_conn, ikp, config.peer_id)
         } else {
             let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);

@@ -128,7 +128,7 @@ fn main() {
 
                         let connection = SecretConnection::new(
                             socket,
-                            &identity_key,
+                            identity_key,
                             secret_connection::Version::V0_34,
                         )
                         .expect("secret connection");

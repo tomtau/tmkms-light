@@ -26,10 +26,12 @@ def test_basic():
         except Exception as e:
             time.sleep(1)
             if time.perf_counter() - start_time >= timeout:
+                print(e)
                 tm_output = tm_proc.stdout.readlines()
+                os.system("pkill -9 " + tmkms)
                 tmkms_output = tmkms_proc.stdout.readlines()
                 tmkms_err = tmkms_proc.stderr.readlines()
-                raise TimeoutError('Waited too long for the RPC port. tm: {}, tmkms: {} {}'.format(tm_output, tmkms_output, tmkms_err)) from e
+                raise TimeoutError('Waited too long for the RPC port.\n tm: {}\ntmkms output:{}\ntmkms error: {}'.format(tm_output, tmkms_output, tmkms_err)) from e
     time.sleep(5)
     contents = urllib.request.urlopen(status_url).read()
     status = json.loads(contents)
@@ -40,4 +42,4 @@ def test_basic():
     validator_address = block['result']['block']['last_commit']['signatures'][0]['validator_address']
     genesis_path = tmhome + "/config/genesis.json"
     genesis = json.loads(Path(genesis_path).read_text())
-    assert validator_address == genesis["validators"][0]["address"] 
+    assert validator_address == genesis["validators"][0]["address"]

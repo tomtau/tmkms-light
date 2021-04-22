@@ -30,7 +30,7 @@ fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn 
         info!("KMS node ID: {}", PublicKey::from(&identity_key));
 
         let connection =
-            SecretConnection::new(socket, &identity_key, secret_connection::Version::V0_34)
+            SecretConnection::new(socket, identity_key, secret_connection::Version::V0_34)
                 .map_err(|e| {
                     error!("secret connection failed: {}", e);
                     io::Error::from(io::ErrorKind::Other)
