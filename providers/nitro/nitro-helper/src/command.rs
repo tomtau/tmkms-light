@@ -1,4 +1,5 @@
 use crate::config::NitroSignOpt;
+use crate::enclave_log_server::LogServer;
 use crate::key_utils::generate_key;
 use crate::proxy::Proxy;
 use crate::shared::{AwsCredentials, NitroConfig};
@@ -161,6 +162,15 @@ pub fn start(config_path: Option<PathBuf>, cid: Option<u32>) -> Result<(), Strin
         if let Some(p) = proxy {
             p.launch_proxy();
         }
+
+        let enclave_log_server = LogServer::new(
+            config.enclave_log_port,
+            config.enclave_log_to_console,
+            config.enclave_log_file.clone(),
+        )
+        .map_err(|e| format!("{:?}", e))?;
+
+        enclave_log_server.launch();
         // state syncing runs in an infinite loop (so does the proxy)
         // TODO: check if signal capture + a graceful shutdown would help with anything (given state writing is via "tempfile")
         state_syncer.launch_syncer().join().expect("state syncing");

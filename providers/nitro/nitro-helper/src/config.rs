@@ -27,6 +27,12 @@ pub struct NitroSignOpt {
     pub enclave_state_port: u32,
     /// Vsock port to forward privval plain traffic to TM over UDS (or just pass to enclave if TCP/secret connection)
     pub enclave_tendermint_conn: u32,
+    /// Vsock port that the enclave server listen on
+    pub enclave_log_port: u32,
+    /// the file that put the enclave log, if it's empty, no need to put log to a file
+    pub enclave_log_file: PathBuf,
+    /// If true, print the enclave log into console
+    pub enclave_log_to_console: bool,
     /// AWS credentials -- if not set, they'll be obtained from IAM
     pub credentials: Option<AwsCredentials>,
     /// AWS region
@@ -48,6 +54,9 @@ impl Default for NitroSignOpt {
             enclave_config_port: 5050,
             enclave_state_port: 5555,
             enclave_tendermint_conn: 5000,
+            enclave_log_port: 6050,
+            enclave_log_file: "".into(),
+            enclave_log_to_console: true,
             credentials: None,
             aws_region: "ap-southeast-1".to_owned(),
         }

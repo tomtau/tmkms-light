@@ -1,4 +1,4 @@
-use crate::shared::VSOCK_PROXY_CID;
+use crate::shared::VSOCK_HOST_CID;
 use anomaly::{fail, format_err};
 use nix::sys::socket::SockAddr;
 use std::os::unix::io::AsRawFd;
@@ -53,7 +53,7 @@ impl StateSyncer {
             ),
         }?;
 
-        let sockaddr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
+        let sockaddr = SockAddr::new_vsock(VSOCK_HOST_CID, vsock_port);
         let vsock_listener = VsockListener::bind(&sockaddr).map_err(|e| {
             format_err!(
                 StateErrorKind::SyncError,

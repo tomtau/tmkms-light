@@ -12,3 +12,8 @@ This project contains portions of code derived from the following libraries:
  * Copyright: Copyright 2020 Amazon.com, Inc. or its affiliates.
  * License: Apache License 2.0
  * Repository: https://github.com/aws/aws-nitro-enclaves-acm/
+
+* tokio-rs/tracing
+ * Copyright: Copyright (c) 2019 Tokio Contributors
+ * License: MIT License
+ * Repository: https://github.com/tokio-rs/tracing

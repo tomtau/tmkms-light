@@ -11,6 +11,7 @@ main = ["mz_rusoto_credential", "mz_rusoto_kms", "mz_rusoto_core", "sysinfo"]
 [dependencies]
 anomaly = "0.2"
 bytes = "= 0.5"
+chrono = "0.4"
 ed25519 = { version = "1", features = [ "serde" ] }
 ed25519-dalek = "1"
 mz_rusoto_credential = { version = "0.46", optional = true }
@@ -32,5 +33,6 @@ tokio = { version = "= 0.2", features = [ "rt-core", "time" ] }
 toml = "0.5"
 tracing = "0.1"
 tracing-subscriber = "0.2"
+tracing-core = "0.1"
 vsock = "0.2"
 zeroize = "1"

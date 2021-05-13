@@ -1,23 +1,44 @@
-mod nitro;
 use nix::sys::socket::SockAddr;
-use tracing::{error, info, warn, Level};
-use tracing_subscriber::FmtSubscriber;
+use tracing::{error, info, warn};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::{fmt, EnvFilter};
 use vsock::VsockListener;
 
+use tmkms_nitro_helper::tracing_layer::Layer;
+use tmkms_nitro_helper::VSOCK_HOST_CID;
+
+mod nitro;
+
 fn main() {
-    // TODO: subscriber for production to forward to vsock
-    // TODO: the log level via a command line arg?
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
-    let port = std::env::args()
+    let mut env_args = std::env::args();
+    let port = env_args
         .next()
         .map(|x| x.parse::<u32>().ok())
         .flatten()
         .unwrap_or(5050);
+
+    let log_server_port = env_args
+        .next()
+        .map(|x| x.parse::<u32>().ok())
+        .flatten()
+        .unwrap_or(6050);
+
+    let layer = Layer::new(VSOCK_HOST_CID, log_server_port);
+    let fmt_layer = fmt::layer().with_target(false);
+
+    // TODO: the log level via a command line arg?
+    let level = "info";
+    let filter_layer = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new(level))
+        .unwrap();
+
+    let layered = tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(fmt_layer)
+        .with(layer);
+
+    tracing::subscriber::set_global_default(layered).expect("setting default subscriber failed");
+
     const VMADDR_CID_ANY: u32 = 0xFFFFFFFF;
     let addr = SockAddr::new_vsock(VMADDR_CID_ANY, port);
     let listener = VsockListener::bind(&addr).expect("bind address");

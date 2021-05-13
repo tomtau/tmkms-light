@@ -1,5 +1,6 @@
 mod command;
 mod config;
+mod enclave_log_server;
 mod key_utils;
 mod proxy;
 mod shared;

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use tendermint::{chain, node};
 
 /// CID for listening on the host
-pub const VSOCK_PROXY_CID: u32 = 3;
+pub const VSOCK_HOST_CID: u32 = 3;
 
 /// Nitro config to be pushed to the enclave
 #[derive(Debug, Serialize, Deserialize)]

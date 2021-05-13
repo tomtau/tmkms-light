@@ -1,4 +1,4 @@
-use crate::shared::VSOCK_PROXY_CID;
+use crate::shared::VSOCK_HOST_CID;
 use nix::sys::select::{select, FdSet};
 use nix::sys::socket::SockAddr;
 use std::io::Read;
@@ -30,7 +30,7 @@ impl Proxy {
     /// Returns the file descriptor for it or the appropriate error
     pub fn sock_listen(&self) -> Result<VsockListener, String> {
         info!("binding proxy to vsock port: {}", self.local_port);
-        let sockaddr = SockAddr::new_vsock(VSOCK_PROXY_CID, self.local_port);
+        let sockaddr = SockAddr::new_vsock(VSOCK_HOST_CID, self.local_port);
         let listener = VsockListener::bind(&sockaddr)
             .map_err(|_| format!("Could not bind to {:?}", sockaddr))?;
         info!("Bound to {:?}", sockaddr);

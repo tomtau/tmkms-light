@@ -19,7 +19,7 @@ use tmkms_light::error::{
     ErrorKind::{AccessError, InvalidKey, IoError},
 };
 use tmkms_light::utils::read_u16_payload;
-use tmkms_nitro_helper::{NitroConfig, VSOCK_PROXY_CID};
+use tmkms_nitro_helper::{NitroConfig, VSOCK_HOST_CID};
 use tracing::{error, info, trace, warn};
 use vsock::VsockStream;
 use zeroize::Zeroizing;
@@ -29,7 +29,7 @@ fn get_secret_connection(
     identity_key: &ed25519::Keypair,
     peer_id: Option<Id>,
 ) -> io::Result<Box<dyn Connection>> {
-    let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, vsock_port);
+    let addr = SockAddr::new_vsock(VSOCK_HOST_CID, vsock_port);
     let socket = vsock::VsockStream::connect(&addr)?;
     info!("KMS node ID: {}", PublicKey::from(identity_key));
     // the `Clone` is not derived for Keypair
@@ -74,7 +74,7 @@ pub fn get_connection(
         let conn: io::Result<Box<dyn Connection>> = if let Some(ikp) = id_keypair {
             get_secret_connection(config.enclave_tendermint_conn, ikp, config.peer_id)
         } else {
-            let addr = SockAddr::new_vsock(VSOCK_PROXY_CID, config.enclave_tendermint_conn);
+            let addr = SockAddr::new_vsock(VSOCK_HOST_CID, config.enclave_tendermint_conn);
             if let Ok(socket) = vsock::VsockStream::connect(&addr) {
                 trace!("tendermint vsock port: {}", config.enclave_tendermint_conn);
                 trace!("tendermint peer addr: {:?}", socket.peer_addr());
