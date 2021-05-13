@@ -53,7 +53,13 @@ jobs:
       - name: Install cargo audit
         run: cargo install cargo-audit
       # TODO: unmaintained dependencies -- need to be fixed in upstream
-      - run: cargo audit --deny-warnings --ignore RUSTSEC-2020-0036 --ignore RUSTSEC-2020-0016 --ignore RUSTSEC-2020-0056 --ignore RUSTSEC-2019-0036
+      - run: >
+          cargo audit --deny-warnings
+          --ignore RUSTSEC-2020-0036
+          --ignore RUSTSEC-2020-0016
+          --ignore RUSTSEC-2020-0056
+          --ignore RUSTSEC-2019-0036
+          --ignore RUSTSEC-2021-0064
   
   build:
     runs-on: ubuntu-latest
