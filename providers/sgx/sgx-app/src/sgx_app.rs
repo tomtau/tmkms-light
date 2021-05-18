@@ -2,9 +2,13 @@
 pub(crate) mod keypair_seal;
 /// state persistence helper;
 mod state;
+
+/// helpers for cloud deployments (where CPU affinitity isn't guaranteed)
+mod cloud;
 use ed25519_dalek::Keypair;
 use keypair_seal::CloudWrapKey;
 use rand::rngs::OsRng;
+use sgx_isa::{Report, Targetinfo};
 use std::{io, net::TcpStream, thread, time::Duration};
 use subtle::ConstantTimeEq;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
@@ -96,12 +100,34 @@ pub fn entry(
 ) -> io::Result<()> {
     let mut csprng = OsRng {};
     match (request, cloud_backup_key) {
+        (SgxInitRequest::GenWrapKey { targetinfo }, None) => {
+            let targetinfo = targetinfo.unwrap_or(Targetinfo::from(Report::for_self()));
+            let rsa_kp = cloud::generate_keypair(&mut csprng, targetinfo);
+            if let Ok((wrap_pub_key, wrap_key_sealed, pub_key_report)) = rsa_kp {
+                let response = SgxInitResponse::WrapKey {
+                    wrap_key_sealed,
+                    wrap_pub_key,
+                    pub_key_report,
+                };
+                match serde_json::to_vec(&response) {
+                    Ok(v) => {
+                        debug!("writing response");
+                        write_u16_payload(&mut host_response, &v)?;
+                    }
+                    Err(e) => {
+                        error!("keygen error: {}", e);
+                    }
+                }
+            } else {
+                error!("sealing failed");
+            }
+        }
         (SgxInitRequest::KeyGen, cbk) => {
             let kp = Keypair::generate(&mut csprng);
             let cloud_backup_key_data =
                 cbk.and_then(|key| keypair_seal::cloud_backup(&mut csprng, key, &kp).ok());
             if let Ok(sealed_key_data) = keypair_seal::seal(&mut csprng, &kp) {
-                let response = SgxInitResponse {
+                let response = SgxInitResponse::GenOrRecover {
                     sealed_key_data,
                     cloud_backup_key_data,
                 };
@@ -122,7 +148,7 @@ pub fn entry(
             if let Ok(sealed_key_data) =
                 keypair_seal::seal_recover_cloud_backup(&mut csprng, backup_key, key_data)
             {
-                let response = SgxInitResponse {
+                let response = SgxInitResponse::GenOrRecover {
                     sealed_key_data,
                     cloud_backup_key_data: None,
                 };

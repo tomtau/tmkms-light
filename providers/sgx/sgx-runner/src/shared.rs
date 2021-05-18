@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sgx_isa::{Keypolicy, Keyrequest};
+use sgx_isa::{Keypolicy, Keyrequest, Report, Targetinfo};
 use std::convert::TryInto;
 use tendermint::consensus;
 use tendermint::node;
@@ -102,6 +102,11 @@ pub struct RemoteConnectionConfig {
 /// request sent to the enclave app
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SgxInitRequest {
+    /// generates a wrapping key for cloud backups
+    GenWrapKey {
+        /// if dcap is used
+        targetinfo: Option<Targetinfo>,
+    },
     /// generate a new keypair
     KeyGen,
     /// reseal the keypair from a backup
@@ -117,9 +122,34 @@ pub enum SgxInitRequest {
 
 /// response sent from the enclave app
 #[derive(Debug, Serialize, Deserialize)]
-pub struct SgxInitResponse {
-    /// freshly generated or recovered sealed keypair
-    pub sealed_key_data: SealedKeyData,
-    /// if requested, keypair encrypted with the provided key
-    pub cloud_backup_key_data: Option<CloudBackupKeyData>,
+pub enum SgxInitResponse {
+    WrapKey {
+        /// key sealed for local CPU
+        wrap_key_sealed: SealedKeyData,
+        /// wrapping public key
+        wrap_pub_key: rsa::RSAPublicKey,
+        /// report attesting the wrapping public key
+        /// (to be used for a quote)
+        pub_key_report: Report,
+    },
+    /// response to key generation or recovery
+    GenOrRecover {
+        /// freshly generated or recovered sealed keypair
+        sealed_key_data: SealedKeyData,
+        /// if requested, keypair encrypted with the provided key
+        cloud_backup_key_data: Option<CloudBackupKeyData>,
+    },
+}
+
+impl SgxInitResponse {
+    /// get key generation or recovery response
+    pub fn get_gen_response(self) -> Option<(SealedKeyData, Option<CloudBackupKeyData>)> {
+        match self {
+            SgxInitResponse::GenOrRecover {
+                sealed_key_data,
+                cloud_backup_key_data,
+            } => Some((sealed_key_data, cloud_backup_key_data)),
+            _ => None,
+        }
+    }
 }

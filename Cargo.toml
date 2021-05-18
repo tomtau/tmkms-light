@@ -21,3 +21,6 @@ tracing = "0.1"
 [workspace]
 members = ["providers/softsign", "providers/sgx/sgx-app", "providers/sgx/sgx-runner", "providers/nitro/nitro-enclave", "providers/nitro/nitro-helper"]
 default-members = ["providers/softsign"]
+
+[patch.crates-io]
+ed25519-dalek = { git = "https://github.com/bltavares/ed25519-dalek.git", rev = "5e6c9362ff33c2bbfe189a55e44fd2d68b463227" }
