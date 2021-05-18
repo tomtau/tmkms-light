@@ -1,6 +1,6 @@
 [package]
 name = "tmkms-nitro-enclave"
-version = "0.1.2"
+version = "0.2.0"
 authors = [ "Tomas Tauber <2410580+tomtau@users.noreply.github.com>" ]
 edition = "2018"
 
