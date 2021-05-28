@@ -5,7 +5,7 @@ use rsa::{PaddingScheme, PrivateKeyEncoding, PublicKeyParts, RSAPrivateKey, RSAP
 use sgx_isa::ErrorCode;
 use sgx_isa::{Report, Targetinfo};
 use sha2::{Digest, Sha256};
-use tmkms_light_sgx_runner::{CloudBackupKeyData, SealedKeyData};
+use tmkms_light_sgx_runner::{get_claim, CloudBackupKeyData, SealedKeyData};
 
 pub fn generate_keypair(
     csprng: &mut OsRng,
@@ -15,15 +15,8 @@ pub fn generate_keypair(
     // default exponent 65537
     let priv_key = RSAPrivateKey::new(csprng, bits).expect("failed to generate a key");
     let pub_key = RSAPublicKey::from(&priv_key);
-    // TODO: check if BE is expected
-    let n = pub_key.n().to_bytes_be();
-    let e = pub_key.e().to_bytes_be();
-    let encoded_n = String::from_utf8(subtle_encoding::base64::encode(&n)).expect("encoded n");
-    let encoded_e = String::from_utf8(subtle_encoding::base64::encode(&e)).expect("encoded e");
-    let claim_payload = format!(
-        "{{\"kid\":\"wrapping-key\",\"kty\":\"RSA\",\"e\":\"{}\",\"n\":\"{}\"}}",
-        encoded_e, encoded_n
-    );
+
+    let claim_payload = get_claim(&pub_key);
     // create a Sha256 object
     let mut hasher = Sha256::new();
 
@@ -78,8 +71,59 @@ mod tests {
     use crate::sgx_app::keypair_seal::cloud_backup;
     use ed25519_dalek::Keypair;
     use rand::RngCore;
+    use rsa::BigUint;
     use rsa::PublicKey;
     use tmkms_light::utils::read_u16_payload;
+
+    #[test]
+    fn test_hash() {
+        let payload = "{\"kid\":\"wrapping-key\",\"kty\":\"RSA\",\"e\":\"AQAB\",\"n\":\"kyk2V71OnhuVJAZq5occtRdYxX6eGiR3qQ04UKTZQxesiU3UsnbCq7FURSEr5NTKaU1L3die6VzPn829jdVYiht55hiqsEPYrRutNtmc-dI111lPGmkSaN_WcrK9rScbNn1btnBytf6KkST5Qmeri_Ue_BBjdg_G_WPNFKy1Ds_8lDqDMl3JLHaEjtKA-OtCjNsClzqtavgMJcbxdvHqUB1grbYePM6HrlMyIY1wZUvmdZw3_gwKbNkj5_whq6jYHSG68HdH3QGdbbV8_LFdB4IcfdN0ERXbuo1_0ZXoSd-koSjhfafuBbzrKGwiyzbDm9bSaocnECqENXASMt-YLQ\"}";
+        let mut hasher = Sha256::new();
+
+        hasher.update(payload);
+
+        let result = hasher.finalize();
+        let mine = subtle_encoding::hex::encode(&result);
+        assert_eq!(
+            mine,
+            "f353c435a23153ed43bc832c230a705b6d2b16b04732844d82538e8e691fcca9"
+                .as_bytes()
+                .to_vec()
+        );
+    }
+
+    #[test]
+    fn test_rsa() {
+        let nb64 = "kyk2V71OnhuVJAZq5occtRdYxX6eGiR3qQ04UKTZQxesiU3UsnbCq7FURSEr5NTKaU1L3die6VzPn829jdVYiht55hiqsEPYrRutNtmc-dI111lPGmkSaN_WcrK9rScbNn1btnBytf6KkST5Qmeri_Ue_BBjdg_G_WPNFKy1Ds_8lDqDMl3JLHaEjtKA-OtCjNsClzqtavgMJcbxdvHqUB1grbYePM6HrlMyIY1wZUvmdZw3_gwKbNkj5_whq6jYHSG68HdH3QGdbbV8_LFdB4IcfdN0ERXbuo1_0ZXoSd-koSjhfafuBbzrKGwiyzbDm9bSaocnECqENXASMt-YLQ==";
+        let eb64 = "AQAB";
+
+        let nb = base64::decode_config(&nb64, base64::URL_SAFE).unwrap();
+        let eb = base64::decode_config(&eb64, base64::URL_SAFE).unwrap();
+        let n = BigUint::from_bytes_be(&nb);
+        let e = BigUint::from_bytes_be(&eb);
+        let pubkey = RSAPublicKey::new(n, e).unwrap();
+        let n = pubkey.n().to_bytes_be();
+        let e = pubkey.e().to_bytes_be();
+        let encoded_n = base64::encode_config(&n, base64::URL_SAFE);
+        let encoded_e = base64::encode_config(&e, base64::URL_SAFE);
+        assert_eq!(nb64, encoded_n);
+        assert_eq!(eb64, encoded_e);
+    }
+
+    #[test]
+    fn test_report() {
+        let rhex = "11110305FF80060000000000000000000000000000000000000000000000000000000000000000000000000000000000050000000000000007000000000000002E2BAC88632809B802B56A638D33824191AE9C3DAADA50A9875AC3EB6F8F202100000000000000000000000000000000000000000000000000000000000000005356F230E3BEC1436E7D7E023663BA453F69E2EDAD820865B098BE457D1B6B32000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007192385C3C0605DE55BB9476CE1D90748190ECB32A8EED7F5207B30CF6A1FE890000000000000000000000000000000000000000000000000000000000000000C88FDB58A572BAC124E1CD4B6BC59C7F00000000000000000000000000000000FB3D7DBC9826DC535BDA22B0F6A38FB5";
+        let rb = subtle_encoding::hex::decode_upper(&rhex).unwrap();
+        let report = Report::try_copy_from(&rb).unwrap();
+        let mut hasher = Sha256::new();
+
+        hasher.update(&[0x01, 0x02, 0x03, 0x04, 0x05, 0x06]);
+
+        let rdata = hasher.finalize();
+        let x: &[u8] = &rdata;
+        let y: &[u8] = &report.reportdata[..32];
+        assert_eq!(x, y);
+    }
 
     // can be run with `cargo test --target x86_64-fortanix-unknown-sgx`
     #[test]

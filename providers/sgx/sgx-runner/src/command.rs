@@ -1,8 +1,7 @@
 use std::{fs, path::PathBuf};
 
 use crate::{config, runner::TmkmsSgxSigner};
-use crate::{shared::SgxInitResponse, SgxInitRequest, CLOUD_KEY_LEN};
-use rsa::PublicKeyParts;
+use crate::{shared::get_claim, shared::SgxInitResponse, SgxInitRequest, CLOUD_KEY_LEN};
 use tendermint::net;
 use tmkms_light::{
     config::validator::ValidatorConfig,
@@ -61,16 +60,7 @@ pub fn keywrap(
 
             config::write_sealed_file(sealed_output_path, &wrap_key_sealed)
                 .map_err(|e| format!("failed to write wrapping key: {:?}", e))?;
-            let n = wrap_pub_key.n().to_bytes_be();
-            let e = wrap_pub_key.e().to_bytes_be();
-            let encoded_n =
-                String::from_utf8(subtle_encoding::base64::encode(&n)).expect("encoded n");
-            let encoded_e =
-                String::from_utf8(subtle_encoding::base64::encode(&e)).expect("encoded e");
-            let claim_payload = format!(
-                "{{\"kid\":\"wrapping-key\",\"kty\":\"RSA\",\"e\":\"{}\",\"n\":\"{}\"}}",
-                encoded_e, encoded_n
-            );
+            let claim_payload = get_claim(&wrap_pub_key);
             let encoded_claim = base64::encode_config(&claim_payload, base64::URL_SAFE);
             if let Some(quote) = quote {
                 let encoded_quote = base64::encode_config(&quote, base64::URL_SAFE);

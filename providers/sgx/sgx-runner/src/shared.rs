@@ -1,3 +1,4 @@
+use rsa::PublicKeyParts;
 use serde::{Deserialize, Serialize};
 use sgx_isa::{Keypolicy, Keyrequest, Report, Targetinfo};
 use std::convert::TryInto;
@@ -139,6 +140,19 @@ pub enum SgxInitResponse {
         /// if requested, keypair encrypted with the provided key
         cloud_backup_key_data: Option<CloudBackupKeyData>,
     },
+}
+
+/// obtain a json claim for RSA pubkey
+/// (bigendian values  are encoded in URL-safe base64)
+pub fn get_claim(wrap_pub_key: &rsa::RSAPublicKey) -> String {
+    let n = wrap_pub_key.n().to_bytes_be();
+    let e = wrap_pub_key.e().to_bytes_be();
+    let encoded_n = base64::encode_config(&n, base64::URL_SAFE);
+    let encoded_e = base64::encode_config(&e, base64::URL_SAFE);
+    format!(
+        "{{\"kid\":\"wrapping-key\",\"kty\":\"RSA\",\"e\":\"{}\",\"n\":\"{}\"}}",
+        encoded_e, encoded_n
+    )
 }
 
 impl SgxInitResponse {

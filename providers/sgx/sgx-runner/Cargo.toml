@@ -5,6 +5,7 @@ authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>", "Linfeng Yu
 edition = "2018"
 
 [dependencies]
+base64 = "0.13"
 serde = { version = "1", features = ["derive"] }
 ed25519 = { version = "1", features = ["serde"] }
 ed25519-dalek = "1"
@@ -19,7 +20,6 @@ zeroize = "1"
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
 anomaly = "0.2"
 aesm-client = { version = "0.5", features = ["sgxs"] }
-base64 = "0.13"
 dcap-ql = "0.3"
 enclave-runner = "0.4"
 serde_json = "1"
