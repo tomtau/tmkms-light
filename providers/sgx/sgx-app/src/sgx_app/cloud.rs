@@ -1,5 +1,8 @@
+mod keywrap;
+
 use crate::sgx_app::keypair_seal::{seal_recover_cloud_backup, CloudWrapKey};
-use aes_keywrap::Aes256KeyWrap;
+use aes::cipher::generic_array::typenum::U32;
+use aes::cipher::generic_array::GenericArray;
 use rand::rngs::OsRng;
 use rsa::{PaddingScheme, PrivateKeyEncoding, PublicKeyParts, RSAPrivateKey, RSAPublicKey};
 use sgx_isa::ErrorCode;
@@ -41,6 +44,41 @@ pub struct CloudSeal {
     wrapped_cloud_sealing_key: [u8; 40],
 }
 
+impl CloudSeal {
+    pub fn new(payload: Vec<u8>) -> Option<Self> {
+        if payload.len() != 296 {
+            None
+        } else {
+            let mut encrypted_symmetric_key = [0u8; 256];
+            encrypted_symmetric_key.copy_from_slice(&payload[..256]);
+            let mut wrapped_cloud_sealing_key = [0u8; 40];
+            wrapped_cloud_sealing_key.copy_from_slice(&payload[256..]);
+            Some(Self {
+                encrypted_symmetric_key,
+                wrapped_cloud_sealing_key,
+            })
+        }
+    }
+}
+
+fn decrypt_wrapped_key(
+    priv_key: &RSAPrivateKey,
+    backup_data_seal: CloudSeal,
+) -> Result<GenericArray<u8, U32>, ErrorCode> {
+    let wrapping_key = priv_key
+        .decrypt(
+            PaddingScheme::new_oaep::<sha2::Sha256>(),
+            &backup_data_seal.encrypted_symmetric_key,
+        )
+        .map_err(|_| ErrorCode::InvalidKeyname)?;
+    let sealing_key = keywrap::aes256_unwrap_key_with_pad(
+        &wrapping_key,
+        &backup_data_seal.wrapped_cloud_sealing_key,
+    )
+    .map_err(|_| ErrorCode::InvalidKeyname)?;
+    Ok(sealing_key)
+}
+
 pub fn reseal_recover_cloud(
     csprng: &mut OsRng,
     sealed_rsa_key: SealedKeyData,
@@ -49,18 +87,7 @@ pub fn reseal_recover_cloud(
 ) -> Result<SealedKeyData, ErrorCode> {
     let priv_key_raw = crate::sgx_app::keypair_seal::unseal_secret(&sealed_rsa_key)?;
     let priv_key = RSAPrivateKey::from_pkcs1(&priv_key_raw).expect("priv key");
-    let wrapping_key = priv_key
-        .decrypt(
-            PaddingScheme::new_pkcs1v15_encrypt(),
-            &backup_data_seal.encrypted_symmetric_key,
-        )
-        .expect("failed to decrypt");
-    let mut wrap_key = [0u8; 32];
-    wrap_key.copy_from_slice(&wrapping_key);
-    let wrap_keyy = Aes256KeyWrap::new(&wrap_key);
-    let sealing_key = wrap_keyy
-        .decapsulate(&backup_data_seal.wrapped_cloud_sealing_key, 32)
-        .expect("unwrapping");
+    let sealing_key = decrypt_wrapped_key(&priv_key, backup_data_seal)?;
     let cloud_sealing = CloudWrapKey::new(sealing_key[..16].to_vec()).unwrap();
     seal_recover_cloud_backup(csprng, cloud_sealing, cloud_backup)
 }
@@ -125,6 +152,59 @@ mod tests {
         assert_eq!(x, y);
     }
 
+    #[test]
+    fn test_rsa2() {
+        let file_content = r#"
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAtPy5JuUM9yKTpC1msedjJv9aFt33vATkopleDa+FctypZwUc
+IfA9ZZk0DZhLRnMnp3Du6V+/KF8E8UMVXrkD0PLT2FBWY2lJJP+596ZFl9g02Y/x
+lB4Irv3F06RkVgtuUR83W+w+XFCAzkWhT6Wsrf1LFvgeBxi86DBxJOnDGl4TRr4/
+AgkX6U4LTRCsd58//XUSEMknz7sxabh/xxRcqHMT661nNDCbvgmSv4jsZnm2/M6g
+tno5exr2dmtFqN5C4N4APZdf/lIAe3h0CXN/VyU/w66mZ1IBDxhvj7TY47kfztjC
+bgh0F4e7aZkBMsy34ca03wtGk7uBAAeGrtM7dwIDAQABAoIBAANyc1ybEX5c7N7O
+j2s8J3jL40IEGGe+/PgV1mxlBQ+5xcGiexDnRPeFMkKI4j2TDAuDlcXhaAlKTpRv
+NALHfAmfZ4HyIcQ58lgNINRC4j0nxfXp+wDYjLzKNLUmlQpayPO+umONBrEItFfn
+HpoxYxvthU2tDD8TpC8nE1QGlTBZsxLU5LhuR0IOblbr3NsPHB15IgVHO8//bJsi
+REAdbL6QrQYc2i0W7LTl2Ch+XKXzOjUJJwlv8hH41Ob2hOxzP9rQTOt7QCMpn873
+yeL+eCGf4AWEIuIwmN7gkIL8ObOoRkW7zBtc3worJoZTYH9uwmhVE7gPKH3WKCoe
+xDpmEAkCgYEA9dTHOCjykJVh6qtMVCV036l8vFY86iUJPO7tz6f8a4UxVXcT3K7i
+SPnuR+TmalzEGGrxamYzHmNvOPk0WgOOQ7bZKHjEniQBSYOrrV1+OlVsOKSdyvPe
+9ecGLdLSjZUk8fGEEMLDNsmggjG37+xcw3hPXmWhe91AZ4HzqHTD/lkCgYEAvHlI
+JR7g4yuNtBhBLNe3qg57Bjq8xU2QTGifiiUbmpcuFKrMjM2nYB5sym0CK124dV2J
+G/DTQYy2EIkJw8LtddOoV4rkvLMHwGIipuXHp5Qg6CFzXcs/b4aHqoA3ORAlxAFx
+NJLLrurr5qiZEnT0kMMND07wtA0WadFFiBzJ7k8CgYALQrXlcqq5yL31e+dBK34R
+CLh4ABNGPnAP5HnsOyuq2S0LVysHvtMKuLgbfva3BIzO+YcZcpkA2Vks6O1m+ia4
+H1YPLokDHW8ZqPhiNpgjn+oXJiM8OrOJ3A1CaBfQ+HX6xy9ffSxoBBBgJlrgmJkf
+MxGfp1QgUmAy3ZcFrmOT8QKBgQCDSC+6u6GGW4YfFm3/oFsst112X1+yR27l6lKG
+1YY+zmOovbgxs+aMi2TYM8o5DtU322lv7vYYSL1hEzOcCqGBW2d9YyAlWMdjeHgO
+rSu/TO0HBJXplXOgaaMCXsEYnGjR+Pcz2bTLKJQdXP8S3iik1Vi5exErOZqNJto6
+D2OQ/QKBgDqYXNWmWWxYZrIrv/ju3IuxgxgWkyrFwTv3gcx1d/ppA/k317gr8YZI
+BTDF9yEwtrEQ1/xuPQMv8x6cnZFYH0ljjbXcTh6VJNv03MSC30pAQCrLSLl3nvHk
+0DQm0TNriAxlF7X5zwR8v2b9yJkbwyyY8IbRQfImWFrzHPF4XzLe
+-----END RSA PRIVATE KEY-----
+"#;
+        let der_encoded = file_content
+            .lines()
+            .filter(|line| !line.starts_with("-"))
+            .fold(String::new(), |mut data, line| {
+                data.push_str(&line);
+                data
+            });
+        let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
+        let secret = RSAPrivateKey::from_pkcs1(&der_bytes).expect("failed to parse key");
+        let pubkey = secret.to_public_key();
+
+        let encrypted_key = "nsohDxPYH9/iyLQvMujkFiTUJr5IiYfNrnYo0hoqoo0rFlUYw995X2REbsogKYcfqWQz7Rld6zEqLfBnD2ess+6pN6O+e1HXxmp6mNXxSAMl2rKGf08Ahl3XbQw0vQ7TNOGGdTlQoli2zbIKE/OsUl5DMqpjSyjDxNDJsKDis65tlnf39k1iMqjYLZMzUZEKTv5Sv16sKhk6TKyvaScNOOd+ctzVay8YFCh0cV9TT4rF/pq64RmX/T8VUTRAgUq/kAt7ZJYw/f2kILMBbBvugc00dq0WxQ+QRC6vDLhxZTxkLDBLHxLxeLlYpVbMMe83uxLcfCoXNOg5og3XeNRMpBNs/asA+eScIlW50xPbpzel9l0AZ9PEu2LAjBjcTAikGdigjKMuDEc=";
+        let enckey_payload = base64::decode(&encrypted_key).expect("decode enc key");
+        assert_eq!(enckey_payload.len(), 296);
+        let seal = CloudSeal::new(enckey_payload).expect("seal");
+        let sealing_key = decrypt_wrapped_key(&secret, seal).expect("sealing key");
+        let sealing_key_hex = "924a14cdcb1b8b0e630cbe643bfbd83ed070879562fe51ece24de27af2a77e5a";
+        let expected_sealing_key = subtle_encoding::hex::decode(&sealing_key_hex).unwrap();
+        let sealkey_ref: &[u8] = sealing_key.as_ref();
+        assert_eq!(sealkey_ref, &expected_sealing_key);
+    }
+
     // can be run with `cargo test --target x86_64-fortanix-unknown-sgx`
     #[test]
     fn test_cloud_seal() {
@@ -133,17 +213,18 @@ mod tests {
             generate_keypair(&mut csprng, Targetinfo::from(Report::for_self())).expect("gen rsa");
         let mut wrap_key1 = [0u8; 32];
         csprng.fill_bytes(&mut wrap_key1);
-        let wrap_keyy = Aes256KeyWrap::new(&wrap_key1);
+        //let wrap_keyy = Aes256KeyWrap::new(&wrap_key1);
 
         let mut wrap_key2 = [0u8; 32];
         csprng.fill_bytes(&mut wrap_key2);
-        let wrapped_key = wrap_keyy.encapsulate(&wrap_key2).expect("wrap");
+        let wrapped_key = aes_keywrap_rs::Aes256Kw::aes_wrap_key_with_pad(&wrap_key1, &wrap_key2)
+            .expect("wrap key"); //wrap_keyy.encapsulate(&wrap_key2).expect("wrap");
         let mut wrapped_cloud_sealing_key = [0u8; 40];
         wrapped_cloud_sealing_key.copy_from_slice(&wrapped_key);
         let enc_data = rsa_pub
             .encrypt(
                 &mut csprng,
-                PaddingScheme::new_pkcs1v15_encrypt(),
+                PaddingScheme::new_oaep::<sha2::Sha256>(),
                 &wrap_key1[..],
             )
             .expect("failed to encrypt");

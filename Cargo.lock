@@ -37,17 +37,6 @@ dependencies = [
 
 [[package]]
 name = "aes"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "884391ef1066acaa41e766ba8f596341b96e93ce34f9a43e7d24bf0a0eaf0561"
-dependencies = [
- "aes-soft",
- "aesni",
- "cipher 0.2.5",
-]
-
-[[package]]
-name = "aes"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32380222440685202b62f23002e668519a6bf2d8df5e7655ed96223b6482b4be"
@@ -65,7 +54,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e28b4604398f52cd06867fe0531b62b35f0edddb561e806945cbab9af7fe6a8"
 dependencies = [
  "aead 0.4.1",
- "aes 0.7.1",
+ "aes",
  "cipher 0.3.0",
  "ctr",
  "polyval",
@@ -74,23 +63,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "aes-keywrap"
-version = "0.2.2"
+name = "aes-keywrap-rs"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e3df4e02616e2152c306803f16e52ed308d2842df7921ad0fa2e7ba726df9f3"
+checksum = "0179d260398111b7879868cabc56bc4045ad8111f0b4e5f656ba7f87d616e2fd"
 dependencies = [
- "aes 0.6.0",
- "byteorder",
-]
-
-[[package]]
-name = "aes-soft"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be14c7498ea50828a38d0e24a765ed2effe92a705885b57d029cd67d45744072"
-dependencies = [
- "cipher 0.2.5",
- "opaque-debug",
+ "crypto2",
+ "hex",
 ]
 
 [[package]]
@@ -110,16 +89,6 @@ dependencies = [
  "sgxs",
  "unix_socket2",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "aesni"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea2e11f5e94c2f7d386164cc2aa1f97823fed6f259e486940a71c174dd01b0ce"
-dependencies = [
- "cipher 0.2.5",
- "opaque-debug",
 ]
 
 [[package]]
@@ -542,6 +511,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto2"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a161713d9e77a76b166714fc1efd2a7d0a6830e8be57eb727b215076fb62e7a4"
+
+[[package]]
 name = "ctr"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -683,6 +658,16 @@ dependencies = [
  "sgx-isa",
  "sgxs",
  "tokio",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17392a012ea30ef05a610aa97dfb49496e71c9f676b27879922ea5bdf60d9d3f"
+dependencies = [
+ "log",
+ "regex",
 ]
 
 [[package]]
@@ -1840,6 +1825,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "quickcheck"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "588f6378e4dd99458b60ec275b4477add41ce4fa9f64dcba6f15adccb19b50d6"
+dependencies = [
+ "env_logger",
+ "log",
+ "rand",
+]
+
+[[package]]
+name = "quickcheck_macros"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b22a693222d716a9587786f37ac3f6b4faedb5b80c23914e7303ff5a1d8016e9"
+dependencies = [
+ "proc-macro2 1.0.26",
+ "quote 1.0.9",
+ "syn 1.0.72",
+]
+
+[[package]]
 name = "quote"
 version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2666,10 +2673,14 @@ dependencies = [
 name = "tmkms-light-sgx-app"
 version = "0.1.2"
 dependencies = [
+ "aes",
  "aes-gcm-siv",
- "aes-keywrap",
+ "aes-keywrap-rs",
  "anomaly",
+ "base64",
  "ed25519-dalek",
+ "quickcheck",
+ "quickcheck_macros",
  "rand",
  "rsa",
  "secrecy",

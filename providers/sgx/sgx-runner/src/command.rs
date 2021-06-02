@@ -2,6 +2,7 @@ use std::{fs, path::PathBuf};
 
 use crate::{config, runner::TmkmsSgxSigner};
 use crate::{shared::get_claim, shared::SgxInitResponse, SgxInitRequest, CLOUD_KEY_LEN};
+use rsa::PublicKeyEncoding;
 use tendermint::net;
 use tmkms_light::{
     config::validator::ValidatorConfig,
@@ -60,16 +61,25 @@ pub fn keywrap(
 
             config::write_sealed_file(sealed_output_path, &wrap_key_sealed)
                 .map_err(|e| format!("failed to write wrapping key: {:?}", e))?;
-            let claim_payload = get_claim(&wrap_pub_key);
-            let encoded_claim = base64::encode_config(&claim_payload, base64::URL_SAFE);
             if let Some(quote) = quote {
+                let claim_payload = get_claim(&wrap_pub_key);
+                let encoded_claim = base64::encode_config(&claim_payload, base64::URL_SAFE);
                 let encoded_quote = base64::encode_config(&quote, base64::URL_SAFE);
-                println!("\"report\": \"{}\"", encoded_quote)
+                print!("{{\"quote\": \"{}\",", encoded_quote);
+                println!(
+                    "\"runtimeData\": {{ \"data\": \"{}\", \"dataType\": \"Binary\" }}}}",
+                    encoded_claim
+                );
+            } else {
+                let pkcs1 = String::from_utf8(
+                    wrap_pub_key
+                        .to_pkcs1()
+                        .map_err(|e| format!("pubkey err: {:?}", e))?,
+                )
+                .map_err(|e| format!("pkcs1 err: {:?}", e))?;
+                println!("wrap public key in PKCS1:\n{}\n", pkcs1);
             }
-            println!(
-                "\"runtimeData\": {{ \"data\": \"{}\", \"dataType\": \"Binary\" }}",
-                encoded_claim
-            );
+
             Ok(())
         }
         _ => Err("unexpected enclave response".to_owned()),

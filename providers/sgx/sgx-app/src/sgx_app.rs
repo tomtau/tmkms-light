@@ -232,13 +232,14 @@ mod tests {
         let (mut stream_signer, _) = listener.accept().unwrap();
         let resp1 = read_u16_payload(&mut stream_signer).expect("response1");
         let response1: SgxInitResponse = serde_json::from_slice(&resp1).expect("response1");
-        let r1_seal = response1.sealed_key_data.clone();
+        let (seal_key_request, cloud_backup_key_data) =
+            response1.get_gen_response().expect("response1");
         let _ = handler.join();
         let handler = std::thread::spawn(move || {
             entry(
                 TcpStream::connect(addr).unwrap(),
                 SgxInitRequest::CloudRecover {
-                    key_data: response1.cloud_backup_key_data.expect("backup"),
+                    key_data: cloud_backup_key_data.expect("backup"),
                 },
                 Some(bk2),
             )
@@ -246,10 +247,11 @@ mod tests {
         let (mut stream_signer, _) = listener.accept().unwrap();
         let resp2 = read_u16_payload(&mut stream_signer).expect("response2");
         let response2: SgxInitResponse = serde_json::from_slice(&resp2).expect("response2");
+        let (seal_key_request2, _) = response2.get_gen_response().expect("response2");
         let _ = handler.join();
         assert_eq!(
-            r1_seal.seal_key_request.keyid,
-            response2.sealed_key_data.seal_key_request.keyid
+            seal_key_request.seal_key_request.keyid,
+            seal_key_request2.seal_key_request.keyid
         );
     }
 
