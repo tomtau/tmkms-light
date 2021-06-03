@@ -70,7 +70,7 @@ pub struct SealedKeyData {
 pub type PublicKey = [u8; 32];
 
 /// length of symmetric key wrap for cloud backup using e.g. cloud KMS
-pub const CLOUD_KEY_LEN: usize = 16;
+pub const CLOUD_KEY_LEN: usize = 32;
 
 /// Returned from the enclave app after keygen
 /// if the cloud backup option is requested.

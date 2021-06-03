@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_recover_flow() {
         let mut csprng = OsRng {};
-        let mut backup_key = vec![0u8; 16];
+        let mut backup_key = vec![0u8; 32];
         csprng.fill_bytes(&mut backup_key);
         let bk1 = CloudWrapKey::new(backup_key.clone()).unwrap();
         let bk2 = CloudWrapKey::new(backup_key).unwrap();
@@ -274,7 +274,7 @@ mod tests {
         let mut csprng = OsRng {};
         let kp = Keypair::generate(&mut csprng);
         let sealed_data = keypair_seal::seal(&mut csprng, &kp).unwrap();
-        let mut backup_key = vec![0u8; 16];
+        let mut backup_key = vec![0u8; 32];
         csprng.fill_bytes(&mut backup_key);
         let bk1 = CloudWrapKey::new(backup_key.clone()).unwrap();
         let bk2 = CloudWrapKey::new(backup_key).unwrap();

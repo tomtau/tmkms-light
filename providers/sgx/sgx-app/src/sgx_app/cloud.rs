@@ -1,3 +1,4 @@
+/// RFC3394/RFC5649 key unwrapping of 32-byte keys
 mod keywrap;
 
 use crate::sgx_app::keypair_seal::{seal_recover_cloud_backup, CloudWrapKey};
@@ -9,24 +10,37 @@ use sgx_isa::ErrorCode;
 use sgx_isa::{Report, Targetinfo};
 use sha2::{Digest, Sha256};
 use tmkms_light_sgx_runner::{get_claim, CloudBackupKeyData, SealedKeyData};
+use zeroize::Zeroize;
 
+/// Possible errors in cloud backup or recovery
+#[derive(Debug)]
+pub enum CloudError {
+    /// RSA generation or PKCS1 issues
+    SecretGenerationError,
+    /// errors from local CPU sealing
+    SealingError(ErrorCode),
+    /// RFC3394/RFC5649 AES-KWP unwrap failed
+    UnwrapError(keywrap::UnwrapError),
+    /// RSA-OAEP+SHA-256 decryption failed
+    DecryptionError,
+}
+
+/// Generates an RSA keypair (2048bit with e=65537),
+/// seals the private key to a local CPU,
+/// and gets a report for sha256 of the public key in JWE.
 pub fn generate_keypair(
     csprng: &mut OsRng,
     targetinfo: Targetinfo,
-) -> Result<(RSAPublicKey, SealedKeyData, Report), ErrorCode> {
+) -> Result<(RSAPublicKey, SealedKeyData, Report), CloudError> {
     let bits = 2048;
     // default exponent 65537
-    let priv_key = RSAPrivateKey::new(csprng, bits).expect("failed to generate a key");
+    let mut priv_key =
+        RSAPrivateKey::new(csprng, bits).map_err(|_| CloudError::SecretGenerationError)?;
     let pub_key = RSAPublicKey::from(&priv_key);
 
     let claim_payload = get_claim(&pub_key);
-    // create a Sha256 object
     let mut hasher = Sha256::new();
-
-    // write input message
     hasher.update(claim_payload);
-
-    // read hash digest and consume hasher
     let result = hasher.finalize();
     let result_len = result.as_slice().len();
     let mut report_data = [0u8; 64];
@@ -34,17 +48,35 @@ pub fn generate_keypair(
         report_data[i] = result[i];
     }
     let report = Report::for_target(&targetinfo, &report_data);
-    let secret = priv_key.to_pkcs1().expect("pkcs1");
-    let sealed_secret = crate::sgx_app::keypair_seal::seal_secret(csprng, &secret, result.into())?;
-    Ok((pub_key, sealed_secret, report))
+    let pkcs1 = priv_key.to_pkcs1();
+    priv_key.zeroize();
+    if let Ok(mut secret) = pkcs1 {
+        match crate::sgx_app::keypair_seal::seal_secret(csprng, &secret, result.into()) {
+            Ok(sealed_secret) => {
+                secret.zeroize();
+                Ok((pub_key, sealed_secret, report))
+            }
+            Err(e) => {
+                secret.zeroize();
+                Err(CloudError::SealingError(e))
+            }
+        }
+    } else {
+        Err(CloudError::SecretGenerationError)
+    }
 }
 
+/// payload from cloud environments for backups
 pub struct CloudSeal {
+    /// kek encrypted using RSA-OAEP+SHA-256
     encrypted_symmetric_key: [u8; 256],
+    /// 32-byte key that can be unwrapped with the decrypted kek
+    /// using RFC3394/RFC5649 AES-KWP
     wrapped_cloud_sealing_key: [u8; 40],
 }
 
 impl CloudSeal {
+    /// returns the struct if the payload length matches the expected on
     pub fn new(payload: Vec<u8>) -> Option<Self> {
         if payload.len() != 296 {
             None
@@ -61,35 +93,46 @@ impl CloudSeal {
     }
 }
 
+/// helper to decrypt the backup key
 fn decrypt_wrapped_key(
     priv_key: &RSAPrivateKey,
     backup_data_seal: CloudSeal,
-) -> Result<GenericArray<u8, U32>, ErrorCode> {
-    let wrapping_key = priv_key
+) -> Result<GenericArray<u8, U32>, CloudError> {
+    let mut wrapping_key = priv_key
         .decrypt(
             PaddingScheme::new_oaep::<sha2::Sha256>(),
             &backup_data_seal.encrypted_symmetric_key,
         )
-        .map_err(|_| ErrorCode::InvalidKeyname)?;
-    let sealing_key = keywrap::aes256_unwrap_key_with_pad(
+        .map_err(|_| CloudError::DecryptionError)?;
+    let msealing_key = keywrap::aes256_unwrap_key_with_pad(
         &wrapping_key,
         &backup_data_seal.wrapped_cloud_sealing_key,
-    )
-    .map_err(|_| ErrorCode::InvalidKeyname)?;
-    Ok(sealing_key)
+    );
+    wrapping_key.zeroize();
+    msealing_key.map_err(CloudError::UnwrapError)
 }
 
+/// tries to recover the secret from the cloud backup data
+/// and (re-)seal it for the current CPU
 pub fn reseal_recover_cloud(
     csprng: &mut OsRng,
     sealed_rsa_key: SealedKeyData,
     backup_data_seal: CloudSeal,
     cloud_backup: CloudBackupKeyData,
-) -> Result<SealedKeyData, ErrorCode> {
-    let priv_key_raw = crate::sgx_app::keypair_seal::unseal_secret(&sealed_rsa_key)?;
-    let priv_key = RSAPrivateKey::from_pkcs1(&priv_key_raw).expect("priv key");
-    let sealing_key = decrypt_wrapped_key(&priv_key, backup_data_seal)?;
-    let cloud_sealing = CloudWrapKey::new(sealing_key[..16].to_vec()).unwrap();
-    seal_recover_cloud_backup(csprng, cloud_sealing, cloud_backup)
+) -> Result<SealedKeyData, CloudError> {
+    let mut priv_key_raw = crate::sgx_app::keypair_seal::unseal_secret(&sealed_rsa_key)
+        .map_err(CloudError::SealingError)?;
+    let mpriv_key = RSAPrivateKey::from_pkcs1(&priv_key_raw);
+    priv_key_raw.zeroize();
+    let mut priv_key = mpriv_key.map_err(|_| CloudError::SecretGenerationError)?;
+    let mbackup_key = decrypt_wrapped_key(&priv_key, backup_data_seal);
+    priv_key.zeroize();
+    let mut backup_key = mbackup_key?;
+    // FIXME: directly pass backup_key to seal_recover_cloud_backup
+    let cloud_backup_key = CloudWrapKey::new(backup_key.to_vec()).unwrap();
+    backup_key.zeroize();
+    seal_recover_cloud_backup(csprng, cloud_backup_key, cloud_backup)
+        .map_err(CloudError::SealingError)
 }
 
 #[cfg(test)]
@@ -100,7 +143,6 @@ mod tests {
     use rand::RngCore;
     use rsa::BigUint;
     use rsa::PublicKey;
-    use tmkms_light::utils::read_u16_payload;
 
     #[test]
     fn test_hash() {
@@ -192,7 +234,6 @@ BTDF9yEwtrEQ1/xuPQMv8x6cnZFYH0ljjbXcTh6VJNv03MSC30pAQCrLSLl3nvHk
             });
         let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
         let secret = RSAPrivateKey::from_pkcs1(&der_bytes).expect("failed to parse key");
-        let pubkey = secret.to_public_key();
 
         let encrypted_key = "nsohDxPYH9/iyLQvMujkFiTUJr5IiYfNrnYo0hoqoo0rFlUYw995X2REbsogKYcfqWQz7Rld6zEqLfBnD2ess+6pN6O+e1HXxmp6mNXxSAMl2rKGf08Ahl3XbQw0vQ7TNOGGdTlQoli2zbIKE/OsUl5DMqpjSyjDxNDJsKDis65tlnf39k1iMqjYLZMzUZEKTv5Sv16sKhk6TKyvaScNOOd+ctzVay8YFCh0cV9TT4rF/pq64RmX/T8VUTRAgUq/kAt7ZJYw/f2kILMBbBvugc00dq0WxQ+QRC6vDLhxZTxkLDBLHxLxeLlYpVbMMe83uxLcfCoXNOg5og3XeNRMpBNs/asA+eScIlW50xPbpzel9l0AZ9PEu2LAjBjcTAikGdigjKMuDEc=";
         let enckey_payload = base64::decode(&encrypted_key).expect("decode enc key");
@@ -235,7 +276,7 @@ BTDF9yEwtrEQ1/xuPQMv8x6cnZFYH0ljjbXcTh6VJNv03MSC30pAQCrLSLl3nvHk
             wrapped_cloud_sealing_key,
         };
         let kp = Keypair::generate(&mut csprng);
-        let cloud_sealing = CloudWrapKey::new(wrap_key2[..16].to_vec()).unwrap();
+        let cloud_sealing = CloudWrapKey::new(wrap_key2.to_vec()).unwrap();
 
         let backup = cloud_backup(&mut csprng, cloud_sealing, &kp).expect("backup");
         reseal_recover_cloud(&mut csprng, sealed_rsa_priv, cloud_seal, backup).expect("reseal");
