@@ -1,15 +1,17 @@
 use rsa::PublicKeyParts;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sgx_isa::{Keypolicy, Keyrequest, Report, Targetinfo};
 use std::convert::TryInto;
+use std::fmt;
+use std::str::FromStr;
 use tendermint::consensus;
 use tendermint::node;
 use tmkms_light::config::validator::ValidatorConfig;
 
 /// keyseal is fixed in the enclave app
-pub type AesGcm128SivNonce = [u8; 12];
+pub type AesGcmSivNonce = [u8; 12];
 
-/// it can potentially be fixed size, as one always seals the ed25519 keypairs
+/// from sealing the ed25519 keypairs + RSA PKCS1
 pub type Ciphertext = Vec<u8>;
 
 /// this partially duplicates `Keyrequest` from sgx-isa,
@@ -62,7 +64,7 @@ impl From<Keyrequest> for KeyRequestWrap {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SealedKeyData {
     pub seal_key_request: KeyRequestWrap,
-    pub nonce: AesGcm128SivNonce,
+    pub nonce: AesGcmSivNonce,
     pub sealed_secret: Ciphertext,
 }
 
@@ -79,7 +81,7 @@ pub const CLOUD_KEY_LEN: usize = 32;
 /// may be relocated and fail to unseal `SealedKeyData`
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CloudBackupKeyData {
-    pub nonce: AesGcm128SivNonce,
+    pub nonce: AesGcmSivNonce,
     pub sealed_secret: Ciphertext,
     pub public_key: ed25519_dalek::PublicKey,
 }
@@ -100,6 +102,98 @@ pub struct RemoteConnectionConfig {
     pub sealed_key: SealedKeyData,
 }
 
+/// package for cloud backups
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CloudBackupKey {
+    pub sealed_rsa_key: SealedKeyData,
+    pub backup_key: CloudBackupSeal,
+}
+
+/// payload from cloud environments for backups
+#[derive(Debug, Clone)]
+pub struct CloudBackupSeal {
+    /// kek encrypted using RSA-OAEP+SHA-256
+    pub encrypted_symmetric_key: [u8; 256],
+    /// 32-byte key that can be unwrapped with the decrypted kek
+    /// using RFC3394/RFC5649 AES-KWP
+    pub wrapped_cloud_sealing_key: [u8; 40],
+}
+
+impl CloudBackupSeal {
+    /// returns the struct if the payload length matches the expected on
+    pub fn new(payload: Vec<u8>) -> Option<Self> {
+        if payload.len() != 296 {
+            None
+        } else {
+            let mut encrypted_symmetric_key = [0u8; 256];
+            encrypted_symmetric_key.copy_from_slice(&payload[..256]);
+            let mut wrapped_cloud_sealing_key = [0u8; 40];
+            wrapped_cloud_sealing_key.copy_from_slice(&payload[256..]);
+            Some(Self {
+                encrypted_symmetric_key,
+                wrapped_cloud_sealing_key,
+            })
+        }
+    }
+}
+
+impl Serialize for CloudBackupSeal {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for CloudBackupSeal {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StrVisitor;
+
+        impl<'de> de::Visitor<'de> for StrVisitor {
+            type Value = CloudBackupSeal;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("CloudBackupSeal")
+            }
+
+            #[inline]
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                CloudBackupSeal::from_str(value).map_err(|err| de::Error::custom(err.to_string()))
+            }
+        }
+
+        deserializer.deserialize_str(StrVisitor)
+    }
+}
+
+impl fmt::Display for CloudBackupSeal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let full = [
+            &self.encrypted_symmetric_key[..],
+            &self.wrapped_cloud_sealing_key[..],
+        ]
+        .concat();
+        let full_str = base64::encode_config(&full, base64::URL_SAFE);
+        write!(f, "{}", full_str)
+    }
+}
+
+impl FromStr for CloudBackupSeal {
+    type Err = base64::DecodeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = base64::decode_config(s, base64::URL_SAFE)?;
+        CloudBackupSeal::new(bytes).ok_or(base64::DecodeError::InvalidLength)
+    }
+}
+
 /// request sent to the enclave app
 #[derive(Debug, Serialize, Deserialize)]
 pub enum SgxInitRequest {
@@ -110,8 +204,17 @@ pub enum SgxInitRequest {
     },
     /// generate a new keypair
     KeyGen,
+    /// generate a new keypair
+    KeyGen2 {
+        cloud_backup: Option<CloudBackupKey>,
+    },
     /// reseal the keypair from a backup
     CloudRecover { key_data: CloudBackupKeyData },
+    /// reseal the keypair from a backup
+    CloudRecover2 {
+        cloud_backup: CloudBackupKey,
+        key_data: CloudBackupKeyData,
+    },
     /// start the main loop for processing Tendermint privval requests
     Start {
         sealed_key: SealedKeyData,

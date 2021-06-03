@@ -56,6 +56,40 @@ enum TmkmsLight {
         #[structopt(short)]
         recover_consensus_key: bool,
     },
+    #[structopt(name = "init2", about = "Create config and generate keys")]
+    /// Create config + keygen
+    Init2 {
+        #[structopt(short)]
+        config_path: Option<PathBuf>,
+        #[structopt(short)]
+        pubkey_display: Option<PubkeyDisplay>,
+        #[structopt(short)]
+        bech32_prefix: Option<String>,
+        #[structopt(short)]
+        wrap_backup_key_path: Option<PathBuf>,
+        #[structopt(short)]
+        external_cloud_key_path: Option<PathBuf>,
+        #[structopt(short)]
+        key_backup_data_path: Option<PathBuf>,
+    },
+    #[structopt(name = "recover2", about = "Recover from cloud backup")]
+    /// Recover from cloud backup payload
+    Recover2 {
+        #[structopt(short)]
+        config_path: Option<PathBuf>,
+        #[structopt(short)]
+        pubkey_display: Option<PubkeyDisplay>,
+        #[structopt(short)]
+        bech32_prefix: Option<String>,
+        #[structopt(short)]
+        wrap_backup_key_path: PathBuf,
+        #[structopt(short)]
+        external_cloud_key_path: PathBuf,
+        #[structopt(short)]
+        key_backup_data_path: PathBuf,
+        #[structopt(short)]
+        recover_consensus_key: bool,
+    },
     #[structopt(name = "start", about = "Start tmkms process")]
     /// start tmkms process
     Start {
@@ -107,6 +141,38 @@ fn main() {
             pubkey_display,
             bech32_prefix,
             external_backup_key_path,
+            key_backup_data_path,
+            recover_consensus_key,
+        ),
+        TmkmsLight::Init2 {
+            config_path,
+            pubkey_display,
+            bech32_prefix,
+            wrap_backup_key_path,
+            external_cloud_key_path,
+            key_backup_data_path,
+        } => command::init2(
+            config_path,
+            pubkey_display,
+            bech32_prefix,
+            wrap_backup_key_path,
+            external_cloud_key_path,
+            key_backup_data_path,
+        ),
+        TmkmsLight::Recover2 {
+            config_path,
+            pubkey_display,
+            bech32_prefix,
+            wrap_backup_key_path,
+            external_cloud_key_path,
+            key_backup_data_path,
+            recover_consensus_key,
+        } => command::recover2(
+            config_path,
+            pubkey_display,
+            bech32_prefix,
+            wrap_backup_key_path,
+            external_cloud_key_path,
             key_backup_data_path,
             recover_consensus_key,
         ),

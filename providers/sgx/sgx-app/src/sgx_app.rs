@@ -122,6 +122,28 @@ pub fn entry(
                 error!("sealing failed");
             }
         }
+        (SgxInitRequest::KeyGen2 { cloud_backup }, _) => {
+            let kp = Keypair::generate(&mut csprng);
+            let cloud_backup_key_data =
+                cloud_backup.and_then(|key| cloud::cloud_backup(&mut csprng, key, &kp).ok());
+            if let Ok(sealed_key_data) = keypair_seal::seal(&mut csprng, &kp) {
+                let response = SgxInitResponse::GenOrRecover {
+                    sealed_key_data,
+                    cloud_backup_key_data,
+                };
+                match serde_json::to_vec(&response) {
+                    Ok(v) => {
+                        debug!("writing response");
+                        write_u16_payload(&mut host_response, &v)?;
+                    }
+                    Err(e) => {
+                        error!("keygen error: {}", e);
+                    }
+                }
+            } else {
+                error!("sealing failed");
+            }
+        }
         (SgxInitRequest::KeyGen, cbk) => {
             let kp = Keypair::generate(&mut csprng);
             let cloud_backup_key_data =
@@ -147,6 +169,33 @@ pub fn entry(
         (SgxInitRequest::CloudRecover { key_data }, Some(backup_key)) => {
             if let Ok(sealed_key_data) =
                 keypair_seal::seal_recover_cloud_backup(&mut csprng, backup_key, key_data)
+            {
+                let response = SgxInitResponse::GenOrRecover {
+                    sealed_key_data,
+                    cloud_backup_key_data: None,
+                };
+                match serde_json::to_vec(&response) {
+                    Ok(v) => {
+                        debug!("writing response");
+                        write_u16_payload(&mut host_response, &v)?;
+                    }
+                    Err(e) => {
+                        error!("recovery error: {}", e);
+                    }
+                }
+            } else {
+                error!("recovery failed");
+            }
+        }
+        (
+            SgxInitRequest::CloudRecover2 {
+                cloud_backup,
+                key_data,
+            },
+            _,
+        ) => {
+            if let Ok(sealed_key_data) =
+                cloud::reseal_recover_cloud(&mut csprng, cloud_backup, key_data)
             {
                 let response = SgxInitResponse::GenOrRecover {
                     sealed_key_data,
