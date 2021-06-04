@@ -71,9 +71,6 @@ pub struct SealedKeyData {
 /// ed25519 pubkey alias
 pub type PublicKey = [u8; 32];
 
-/// length of symmetric key wrap for cloud backup using e.g. cloud KMS
-pub const CLOUD_KEY_LEN: usize = 32;
-
 /// Returned from the enclave app after keygen
 /// if the cloud backup option is requested.
 /// This may be needed in cloud settings
@@ -203,15 +200,11 @@ pub enum SgxInitRequest {
         targetinfo: Option<Targetinfo>,
     },
     /// generate a new keypair
-    KeyGen,
-    /// generate a new keypair
-    KeyGen2 {
+    KeyGen {
         cloud_backup: Option<CloudBackupKey>,
     },
     /// reseal the keypair from a backup
-    CloudRecover { key_data: CloudBackupKeyData },
-    /// reseal the keypair from a backup
-    CloudRecover2 {
+    CloudRecover {
         cloud_backup: CloudBackupKey,
         key_data: CloudBackupKeyData,
     },

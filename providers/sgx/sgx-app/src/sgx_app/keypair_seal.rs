@@ -1,90 +1,13 @@
 use aes_gcm_siv::{
     aead::{generic_array::GenericArray, Aead, NewAead, Payload},
-    Aes128GcmSiv, Aes256GcmSiv,
+    Aes128GcmSiv,
 };
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::{rngs::OsRng, RngCore};
-use secrecy::{ExposeSecret, SecretVec};
 use sgx_isa::{ErrorCode, Keyname, Keypolicy, Keyrequest, Report};
 use std::convert::TryInto;
-use tmkms_light_sgx_runner::{CloudBackupKeyData, SealedKeyData, CLOUD_KEY_LEN};
+use tmkms_light_sgx_runner::SealedKeyData;
 use zeroize::Zeroize;
-
-/// symmetric key wrap -- e.g. from cloud KMS
-pub struct CloudWrapKey(SecretVec<u8>);
-
-impl ExposeSecret<Vec<u8>> for CloudWrapKey {
-    fn expose_secret(&self) -> &Vec<u8> {
-        self.0.expose_secret()
-    }
-}
-
-impl CloudWrapKey {
-    /// creates the new wrapper if the length is correct
-    pub fn new(secret: Vec<u8>) -> Option<Self> {
-        if secret.len() == CLOUD_KEY_LEN {
-            Some(Self(SecretVec::new(secret)))
-        } else {
-            None
-        }
-    }
-}
-
-/// As cloud vendors may not guarantee HW affinity,
-/// this is optionally used to seal the keypair with the externally provided
-/// key (e.g. injected from cloud HSM) with `Aes256GcmSiv`.
-/// The payload encrypted with this key can then be used to recover
-/// when the instance is relocated etc.
-pub fn cloud_backup(
-    csprng: &mut OsRng,
-    seal_key: CloudWrapKey,
-    keypair: &Keypair,
-) -> Result<CloudBackupKeyData, aes_gcm_siv::aead::Error> {
-    let mut nonce = [0u8; 12];
-    csprng.fill_bytes(&mut nonce);
-    let payload = Payload {
-        msg: keypair.secret.as_bytes(),
-        aad: keypair.public.as_bytes(),
-    };
-    let nonce_ga = GenericArray::from_slice(&nonce);
-    let gk = GenericArray::from_slice(seal_key.expose_secret());
-    let aead = Aes256GcmSiv::new(gk);
-    aead.encrypt(nonce_ga, payload)
-        .map(|sealed_secret| CloudBackupKeyData {
-            sealed_secret,
-            nonce,
-            public_key: keypair.public,
-        })
-}
-
-/// Recovers the backed up keypair (decrypt it using the externally
-/// provided key, e.g. injected from cloud HSM) and seals it on that CPU.
-pub fn seal_recover_cloud_backup(
-    csprng: &mut OsRng,
-    seal_key: CloudWrapKey,
-    backup_data: CloudBackupKeyData,
-) -> Result<SealedKeyData, ErrorCode> {
-    let nonce_ga = GenericArray::from_slice(&backup_data.nonce);
-    let gk = GenericArray::from_slice(&seal_key.expose_secret());
-    let aead = Aes256GcmSiv::new(gk);
-    let payload = Payload {
-        msg: &backup_data.sealed_secret,
-        aad: backup_data.public_key.as_bytes(),
-    };
-    if let Ok(mut secret_key) = aead.decrypt(nonce_ga, payload) {
-        drop(seal_key);
-        let secret = SecretKey::from_bytes(&secret_key).map_err(|_| ErrorCode::InvalidSignature)?;
-        secret_key.zeroize();
-        let public = PublicKey::from(&secret);
-        let mut kp = Keypair { secret, public };
-        let sealed = seal(csprng, &kp);
-        kp.secret.zeroize();
-        sealed
-    } else {
-        drop(seal_key);
-        Err(ErrorCode::MacCompareFail)
-    }
-}
 
 fn seal_payload(
     csprng: &mut OsRng,

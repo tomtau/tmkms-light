@@ -1,14 +1,14 @@
 /// RFC3394/RFC5649 key unwrapping of 32-byte keys
 mod keywrap;
 
-use crate::sgx_app::keypair_seal::{seal_recover_cloud_backup, CloudWrapKey};
+use crate::sgx_app::keypair_seal::seal;
 use aes::cipher::generic_array::typenum::U32;
 use aes::cipher::generic_array::GenericArray;
 use aes_gcm_siv::{
     aead::{Aead, NewAead, Payload},
     Aes256GcmSiv,
 };
-use ed25519_dalek::Keypair;
+use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use rsa::{PaddingScheme, PrivateKeyEncoding, RSAPrivateKey, RSAPublicKey};
@@ -147,22 +147,71 @@ pub fn reseal_recover_cloud(
     let mut priv_key = mpriv_key.map_err(|_| CloudError::SecretGenerationError)?;
     let mbackup_key = decrypt_wrapped_key(&priv_key, backup.backup_key);
     priv_key.zeroize();
-    let mut backup_key = mbackup_key?;
-    // FIXME: directly pass backup_key to seal_recover_cloud_backup
-    let cloud_backup_key = CloudWrapKey::new(backup_key.to_vec()).unwrap();
-    backup_key.zeroize();
-    seal_recover_cloud_backup(csprng, cloud_backup_key, cloud_backup)
-        .map_err(CloudError::SealingError)
+    let backup_key = mbackup_key?;
+    seal_recover_cloud_backup(csprng, backup_key, cloud_backup).map_err(CloudError::SealingError)
+}
+
+/// Recovers the backed up keypair (decrypt it using the externally
+/// provided key, e.g. injected from cloud HSM) and seals it on that CPU.
+pub fn seal_recover_cloud_backup(
+    csprng: &mut OsRng,
+    mut seal_key: GenericArray<u8, U32>,
+    backup_data: CloudBackupKeyData,
+) -> Result<SealedKeyData, ErrorCode> {
+    let nonce_ga = GenericArray::from_slice(&backup_data.nonce);
+    let aead = Aes256GcmSiv::new(&seal_key);
+    let payload = Payload {
+        msg: &backup_data.sealed_secret,
+        aad: backup_data.public_key.as_bytes(),
+    };
+    if let Ok(mut secret_key) = aead.decrypt(nonce_ga, payload) {
+        seal_key.zeroize();
+        let secret = SecretKey::from_bytes(&secret_key).map_err(|_| ErrorCode::InvalidSignature)?;
+        secret_key.zeroize();
+        let public = PublicKey::from(&secret);
+        let mut kp = Keypair { secret, public };
+        let sealed = seal(csprng, &kp);
+        kp.secret.zeroize();
+        sealed
+    } else {
+        seal_key.zeroize();
+        Err(ErrorCode::MacCompareFail)
+    }
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use ed25519_dalek::Keypair;
     use rand::RngCore;
     use rsa::BigUint;
     use rsa::PublicKey;
     use rsa::PublicKeyParts;
+
+    pub fn get_wrapped_key(csprng: &mut OsRng, rsa_pub: RSAPublicKey) -> CloudBackupSeal {
+        let mut wrap_key1 = [0u8; 32];
+        csprng.fill_bytes(&mut wrap_key1);
+
+        let mut wrap_key2 = [0u8; 32];
+        csprng.fill_bytes(&mut wrap_key2);
+        let wrapped_key = aes_keywrap_rs::Aes256Kw::aes_wrap_key_with_pad(&wrap_key1, &wrap_key2)
+            .expect("wrap key");
+        let mut wrapped_cloud_sealing_key = [0u8; 40];
+        wrapped_cloud_sealing_key.copy_from_slice(&wrapped_key);
+        let enc_data = rsa_pub
+            .encrypt(
+                csprng,
+                PaddingScheme::new_oaep::<sha2::Sha256>(),
+                &wrap_key1[..],
+            )
+            .expect("failed to encrypt");
+        let mut encrypted_symmetric_key = [0u8; 256];
+        encrypted_symmetric_key.copy_from_slice(&enc_data);
+        CloudBackupSeal {
+            encrypted_symmetric_key,
+            wrapped_cloud_sealing_key,
+        }
+    }
 
     #[test]
     fn test_hash() {
@@ -266,34 +315,12 @@ BTDF9yEwtrEQ1/xuPQMv8x6cnZFYH0ljjbXcTh6VJNv03MSC30pAQCrLSLl3nvHk
         assert_eq!(sealkey_ref, &expected_sealing_key);
     }
 
-    // can be run with `cargo test --target x86_64-fortanix-unknown-sgx`
     #[test]
-    fn test_cloud_seal() {
+    fn test_cloud_reseal() {
         let mut csprng = OsRng {};
         let (rsa_pub, sealed_rsa_priv, _report) =
             generate_keypair(&mut csprng, Targetinfo::from(Report::for_self())).expect("gen rsa");
-        let mut wrap_key1 = [0u8; 32];
-        csprng.fill_bytes(&mut wrap_key1);
-
-        let mut wrap_key2 = [0u8; 32];
-        csprng.fill_bytes(&mut wrap_key2);
-        let wrapped_key = aes_keywrap_rs::Aes256Kw::aes_wrap_key_with_pad(&wrap_key1, &wrap_key2)
-            .expect("wrap key");
-        let mut wrapped_cloud_sealing_key = [0u8; 40];
-        wrapped_cloud_sealing_key.copy_from_slice(&wrapped_key);
-        let enc_data = rsa_pub
-            .encrypt(
-                &mut csprng,
-                PaddingScheme::new_oaep::<sha2::Sha256>(),
-                &wrap_key1[..],
-            )
-            .expect("failed to encrypt");
-        let mut encrypted_symmetric_key = [0u8; 256];
-        encrypted_symmetric_key.copy_from_slice(&enc_data);
-        let cloud_seal = CloudBackupSeal {
-            encrypted_symmetric_key,
-            wrapped_cloud_sealing_key,
-        };
+        let cloud_seal = get_wrapped_key(&mut csprng, rsa_pub);
         let cbk = CloudBackupKey {
             sealed_rsa_key: sealed_rsa_priv,
             backup_key: cloud_seal,
@@ -301,5 +328,25 @@ BTDF9yEwtrEQ1/xuPQMv8x6cnZFYH0ljjbXcTh6VJNv03MSC30pAQCrLSLl3nvHk
         let kp = Keypair::generate(&mut csprng);
         let backup = cloud_backup(&mut csprng, cbk.clone(), &kp).expect("backup");
         reseal_recover_cloud(&mut csprng, cbk, backup).expect("reseal");
+    }
+
+    #[test]
+    fn test_recover_fail() {
+        let mut csprng = OsRng {};
+        let (rsa_pub, sealed_rsa_priv, _report) =
+            generate_keypair(&mut csprng, Targetinfo::from(Report::for_self())).expect("gen rsa");
+        let cloud_seal = get_wrapped_key(&mut csprng, rsa_pub);
+        let cbk = CloudBackupKey {
+            sealed_rsa_key: sealed_rsa_priv,
+            backup_key: cloud_seal,
+        };
+        let kp = Keypair::generate(&mut csprng);
+        let backup = cloud_backup(&mut csprng, cbk.clone(), &kp).expect("backup");
+        let mut bm = backup.clone();
+        bm.sealed_secret[0] ^= 1;
+        assert!(reseal_recover_cloud(&mut csprng, cbk.clone(), bm).is_err());
+        let mut cbkm = cbk.clone();
+        cbkm.backup_key.encrypted_symmetric_key[0] ^= 1;
+        assert!(reseal_recover_cloud(&mut csprng, cbkm, backup).is_err());
     }
 }
