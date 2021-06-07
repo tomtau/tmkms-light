@@ -78,20 +78,8 @@ $ tmkms-light-sgx-runner init -b bech32_prefix -p "bech32"
 <details>
   <summary>With cloud backup key</summary>
 
-One may provide flag `-e backup_key_path` which is to encrypt and decrypt `consensus-key.backup` in directory specified in `-k backup_data_path`
-
-One may also want to use [Azure Key Vault secret](https://docs.microsoft.com/en-us/azure/key-vault/secrets/quick-create-python) or its equivalents to store your backup key.
-
-> :warning: After storing your backup key in Azure Key Vault or its equivalents, make sure to delete the backup key from any local environments to prevent its potential leakage.
-
-> :warning: The instructions do not cover the adequate secure policy setup in Azure Key Vault or its equivalents, so make sure the policy restricts the backup key access only to particular instances during a recovery process.
-
-> :warning: The current cloud key backup implementation is very rudimentary and potentially dangerous -- *use at your own risk* -- we plan to enhance this implementation once solutions for "cloud sealing" become generally available.
-### Init
-```bash
-$ tmkms-light-sgx-runner init -b bech32_prefix -p "bech32" -e backup_key_path -k backup_data_path
-```
-Or follow the example python script to run [init](script/tmkms-sgx/init.py)
+TODO: these instructions are to be enhanced later on.
+One may provide flag `-e backup_key_path` which is to encrypt and decrypt `consensus-key.backup` in directory specified in `-k backup_data_path`. Before `init`, you will need to run `tmkms-light-sgx-runner cloud-wrap -s wrap_key_path -d`
 
 ### Recover
 ```bash
