@@ -42,21 +42,18 @@ pub fn generate_keypair(
     csprng: &mut OsRng,
     targetinfo: Targetinfo,
 ) -> Result<(RSAPublicKey, SealedKeyData, Report), CloudError> {
-    let bits = 2048;
+    const BITS: usize = 2048;
     // default exponent 65537
     let mut priv_key =
-        RSAPrivateKey::new(csprng, bits).map_err(|_| CloudError::SecretGenerationError)?;
+        RSAPrivateKey::new(csprng, BITS).map_err(|_| CloudError::SecretGenerationError)?;
     let pub_key = RSAPublicKey::from(&priv_key);
 
     let claim_payload = get_claim(&pub_key);
     let mut hasher = Sha256::new();
     hasher.update(claim_payload);
-    let result = hasher.finalize();
-    let result_len = result.as_slice().len();
+    let result: GenericArray<u8, U32> = hasher.finalize();
     let mut report_data = [0u8; 64];
-    for i in 0..result_len {
-        report_data[i] = result[i];
-    }
+    report_data[0..32].copy_from_slice(&result);
     let report = Report::for_target(&targetinfo, &report_data);
     let pkcs1 = priv_key.to_pkcs1();
     priv_key.zeroize();
@@ -265,6 +262,7 @@ pub mod tests {
 
     #[test]
     fn test_rsa2() {
+        // test-only private key
         let file_content = r#"
 -----BEGIN RSA PRIVATE KEY-----
 MIIEowIBAAKCAQEAtPy5JuUM9yKTpC1msedjJv9aFt33vATkopleDa+FctypZwUc
