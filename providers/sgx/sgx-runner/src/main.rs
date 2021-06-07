@@ -3,7 +3,7 @@ mod config;
 mod runner;
 mod shared;
 mod state;
-use shared::{SgxInitRequest, CLOUD_KEY_LEN};
+use shared::SgxInitRequest;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -16,6 +16,16 @@ use tracing_subscriber::FmtSubscriber;
     about = "runner for signing backend app using SGX"
 )]
 enum TmkmsLight {
+    #[structopt(name = "cloud-wrap", about = "Generate a wrap key for cloud backups")]
+    /// Create config + keygen
+    CloudWrapKeyGen {
+        #[structopt(short)]
+        enclave_path: Option<PathBuf>,
+        #[structopt(short)]
+        sealed_wrap_key_path: Option<PathBuf>,
+        #[structopt(short)]
+        dcap: bool,
+    },
     #[structopt(name = "init", about = "Create config and generate keys")]
     /// Create config + keygen
     Init {
@@ -26,7 +36,9 @@ enum TmkmsLight {
         #[structopt(short)]
         bech32_prefix: Option<String>,
         #[structopt(short)]
-        external_backup_key_path: Option<PathBuf>,
+        wrap_backup_key_path: Option<PathBuf>,
+        #[structopt(short)]
+        external_cloud_key_path: Option<PathBuf>,
         #[structopt(short)]
         key_backup_data_path: Option<PathBuf>,
     },
@@ -40,7 +52,9 @@ enum TmkmsLight {
         #[structopt(short)]
         bech32_prefix: Option<String>,
         #[structopt(short)]
-        external_backup_key_path: PathBuf,
+        wrap_backup_key_path: PathBuf,
+        #[structopt(short)]
+        external_cloud_key_path: PathBuf,
         #[structopt(short)]
         key_backup_data_path: PathBuf,
         #[structopt(short)]
@@ -62,17 +76,30 @@ fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let result = match opt {
+        TmkmsLight::CloudWrapKeyGen {
+            enclave_path,
+            sealed_wrap_key_path,
+            dcap,
+        } => {
+            let enclave_path =
+                enclave_path.unwrap_or_else(|| "enclave/tmkms-light-sgx-app.sgxs".into());
+            let sealed_wrap_key_path =
+                sealed_wrap_key_path.unwrap_or_else(|| "sealed-wrap.key".into());
+            command::keywrap(enclave_path, sealed_wrap_key_path, dcap)
+        }
         TmkmsLight::Init {
             config_path,
             pubkey_display,
             bech32_prefix,
-            external_backup_key_path,
+            wrap_backup_key_path,
+            external_cloud_key_path,
             key_backup_data_path,
         } => command::init(
             config_path,
             pubkey_display,
             bech32_prefix,
-            external_backup_key_path,
+            wrap_backup_key_path,
+            external_cloud_key_path,
             key_backup_data_path,
         ),
         TmkmsLight::Start { config_path } => command::start(config_path),
@@ -80,14 +107,16 @@ fn main() {
             config_path,
             pubkey_display,
             bech32_prefix,
-            external_backup_key_path,
+            wrap_backup_key_path,
+            external_cloud_key_path,
             key_backup_data_path,
             recover_consensus_key,
         } => command::recover(
             config_path,
             pubkey_display,
             bech32_prefix,
-            external_backup_key_path,
+            wrap_backup_key_path,
+            external_cloud_key_path,
             key_backup_data_path,
             recover_consensus_key,
         ),

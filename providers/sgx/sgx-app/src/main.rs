@@ -20,19 +20,11 @@ fn main() -> std::io::Result<()> {
         return Err(std::io::ErrorKind::Other.into());
     }
     let request = request.unwrap();
-    let mcloud_key = args.next();
-    let cloud_key = if let Some(k) = mcloud_key {
-        let decoded_vec = subtle_encoding::hex::decode(k)
-            .map_err(|_e| std::io::Error::from(std::io::ErrorKind::Other))?;
-        sgx_app::keypair_seal::CloudWrapKey::new(decoded_vec)
-    } else {
-        None
-    };
     // "init" stream is provided by the enclave runner
     // user call extension (in sgx-runner)
     let init_conn = std::net::TcpStream::connect("init")?;
     tracing::info!("connected to init stream");
-    if let Err(e) = sgx_app::entry(init_conn, request, cloud_key) {
+    if let Err(e) = sgx_app::entry(init_conn, request) {
         tracing::error!("error: {}", e);
         Err(e)
     } else {

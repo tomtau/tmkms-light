@@ -1,6 +1,6 @@
 [package]
 name = "tmkms-light"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>"]
 edition = "2018"
 
@@ -21,3 +21,7 @@ tracing = "0.1"
 [workspace]
 members = ["providers/softsign", "providers/sgx/sgx-app", "providers/sgx/sgx-runner", "providers/nitro/nitro-enclave", "providers/nitro/nitro-helper"]
 default-members = ["providers/softsign"]
+
+[patch.crates-io]
+# TODO: use upstream when this is merged: https://github.com/dalek-cryptography/ed25519-dalek/pull/160 
+ed25519-dalek = { git = "https://github.com/crypto-com/ed25519-dalek", rev = "5e6c9362ff33c2bbfe189a55e44fd2d68b463227" }

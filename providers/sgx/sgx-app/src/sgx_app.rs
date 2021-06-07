@@ -2,9 +2,12 @@
 pub(crate) mod keypair_seal;
 /// state persistence helper;
 mod state;
+
+/// helpers for cloud deployments (where CPU affinitity isn't guaranteed)
+mod cloud;
 use ed25519_dalek::Keypair;
-use keypair_seal::CloudWrapKey;
 use rand::rngs::OsRng;
+use sgx_isa::{Report, Targetinfo};
 use std::{io, net::TcpStream, thread, time::Duration};
 use subtle::ConstantTimeEq;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
@@ -88,20 +91,38 @@ pub fn get_connection(secret_connection: Option<&RemoteConnectionConfig>) -> Box
 /// a simple req-rep handling loop
 /// `TcpStream` is either provided in tests or from the "init"
 /// enclave runner's user call extension.
-/// TODO: no need to pass the host_response stream + cloud_backup_key for "Start"
-pub fn entry(
-    mut host_response: TcpStream,
-    request: SgxInitRequest,
-    cloud_backup_key: Option<CloudWrapKey>,
-) -> io::Result<()> {
+/// TODO: no need to pass the host_response stream for "Start"
+pub fn entry(mut host_response: TcpStream, request: SgxInitRequest) -> io::Result<()> {
     let mut csprng = OsRng {};
-    match (request, cloud_backup_key) {
-        (SgxInitRequest::KeyGen, cbk) => {
+    match request {
+        SgxInitRequest::GenWrapKey { targetinfo } => {
+            let targetinfo = targetinfo.unwrap_or_else(|| Targetinfo::from(Report::for_self()));
+            let rsa_kp = cloud::generate_keypair(&mut csprng, targetinfo);
+            if let Ok((wrap_pub_key, wrap_key_sealed, pub_key_report)) = rsa_kp {
+                let response = SgxInitResponse::WrapKey {
+                    wrap_key_sealed,
+                    wrap_pub_key,
+                    pub_key_report,
+                };
+                match serde_json::to_vec(&response) {
+                    Ok(v) => {
+                        debug!("writing response");
+                        write_u16_payload(&mut host_response, &v)?;
+                    }
+                    Err(e) => {
+                        error!("keygen error: {}", e);
+                    }
+                }
+            } else {
+                error!("sealing failed");
+            }
+        }
+        SgxInitRequest::KeyGen { cloud_backup } => {
             let kp = Keypair::generate(&mut csprng);
             let cloud_backup_key_data =
-                cbk.and_then(|key| keypair_seal::cloud_backup(&mut csprng, key, &kp).ok());
+                cloud_backup.and_then(|key| cloud::cloud_backup(&mut csprng, key, &kp).ok());
             if let Ok(sealed_key_data) = keypair_seal::seal(&mut csprng, &kp) {
-                let response = SgxInitResponse {
+                let response = SgxInitResponse::GenOrRecover {
                     sealed_key_data,
                     cloud_backup_key_data,
                 };
@@ -118,11 +139,14 @@ pub fn entry(
                 error!("sealing failed");
             }
         }
-        (SgxInitRequest::CloudRecover { key_data }, Some(backup_key)) => {
+        SgxInitRequest::CloudRecover {
+            cloud_backup,
+            key_data,
+        } => {
             if let Ok(sealed_key_data) =
-                keypair_seal::seal_recover_cloud_backup(&mut csprng, backup_key, key_data)
+                cloud::reseal_recover_cloud(&mut csprng, cloud_backup, key_data)
             {
-                let response = SgxInitResponse {
+                let response = SgxInitResponse::GenOrRecover {
                     sealed_key_data,
                     cloud_backup_key_data: None,
                 };
@@ -139,15 +163,12 @@ pub fn entry(
                 error!("recovery failed");
             }
         }
-        (
-            SgxInitRequest::Start {
-                sealed_key,
-                config,
-                secret_connection,
-                initial_state,
-            },
-            None,
-        ) => {
+        SgxInitRequest::Start {
+            sealed_key,
+            config,
+            secret_connection,
+            initial_state,
+        } => {
             let state_holder = state::StateHolder::new()?;
             if let Ok(keypair) = keypair_seal::unseal(&sealed_key) {
                 let conn: Box<dyn Connection> = get_connection(secret_connection.as_ref());
@@ -170,10 +191,6 @@ pub fn entry(
                 return Err(io::ErrorKind::Other.into());
             }
         }
-        _ => {
-            error!("invalid command arguments");
-            return Err(io::ErrorKind::Other.into());
-        }
     }
     Ok(())
 }
@@ -181,49 +198,69 @@ pub fn entry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::RngCore;
     use std::net::{TcpListener, TcpStream};
     use tmkms_light::utils::read_u16_payload;
+    use tmkms_light_sgx_runner::CloudBackupKey;
 
     // can be run with `cargo test --target x86_64-fortanix-unknown-sgx`
     #[test]
     fn test_recover_flow() {
-        let mut csprng = OsRng {};
-        let mut backup_key = vec![0u8; 16];
-        csprng.fill_bytes(&mut backup_key);
-        let bk1 = CloudWrapKey::new(backup_key.clone()).unwrap();
-        let bk2 = CloudWrapKey::new(backup_key).unwrap();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
-
+        let (sender, receiver) = std::sync::mpsc::channel();
         let handler = std::thread::spawn(move || {
-            entry(
-                TcpStream::connect(addr).unwrap(),
-                SgxInitRequest::KeyGen,
-                Some(bk1),
-            )
+            while let Ok(Some(req)) = receiver.recv() {
+                entry(TcpStream::connect(addr).unwrap(), req).expect("ok entry");
+            }
         });
+        sender
+            .send(Some(SgxInitRequest::GenWrapKey { targetinfo: None }))
+            .expect("send request0");
+        let (mut stream_signer, _) = listener.accept().unwrap();
+        let resp1 = read_u16_payload(&mut stream_signer).expect("response0");
+        let response1: SgxInitResponse = serde_json::from_slice(&resp1).expect("response0");
+        let (sealed_rsa_key, pubkey) = match response1 {
+            SgxInitResponse::WrapKey {
+                wrap_key_sealed,
+                wrap_pub_key,
+                ..
+            } => (wrap_key_sealed, wrap_pub_key),
+            _ => panic!("wrong response"),
+        };
+        let mut csprng = OsRng {};
+
+        let backup_key = cloud::tests::get_wrapped_key(&mut csprng, pubkey);
+        let cloud_backup = CloudBackupKey {
+            sealed_rsa_key,
+            backup_key,
+        };
+        let cloud_backup2 = cloud_backup.clone();
+        sender
+            .send(Some(SgxInitRequest::KeyGen {
+                cloud_backup: Some(cloud_backup),
+            }))
+            .expect("send request1");
         let (mut stream_signer, _) = listener.accept().unwrap();
         let resp1 = read_u16_payload(&mut stream_signer).expect("response1");
         let response1: SgxInitResponse = serde_json::from_slice(&resp1).expect("response1");
-        let r1_seal = response1.sealed_key_data.clone();
-        let _ = handler.join();
-        let handler = std::thread::spawn(move || {
-            entry(
-                TcpStream::connect(addr).unwrap(),
-                SgxInitRequest::CloudRecover {
-                    key_data: response1.cloud_backup_key_data.expect("backup"),
-                },
-                Some(bk2),
-            )
-        });
+        let (seal_key_request, cloud_backup_key_data) =
+            response1.get_gen_response().expect("response1");
+        sender
+            .send(Some(SgxInitRequest::CloudRecover {
+                cloud_backup: cloud_backup2,
+                key_data: cloud_backup_key_data.expect("backup"),
+            }))
+            .expect("send request2");
+
         let (mut stream_signer, _) = listener.accept().unwrap();
         let resp2 = read_u16_payload(&mut stream_signer).expect("response2");
         let response2: SgxInitResponse = serde_json::from_slice(&resp2).expect("response2");
+        let (seal_key_request2, _) = response2.get_gen_response().expect("response2");
+        sender.send(None).expect("send request3");
         let _ = handler.join();
         assert_eq!(
-            r1_seal.seal_key_request.keyid,
-            response2.sealed_key_data.seal_key_request.keyid
+            seal_key_request.seal_key_request.keyid,
+            seal_key_request2.seal_key_request.keyid
         );
     }
 
@@ -237,28 +274,6 @@ mod tests {
         assert!(keypair_seal::unseal(&mangled_sealed_data).is_err());
         assert_eq!(
             keypair_seal::unseal(&sealed_data).unwrap().public,
-            kp.public
-        );
-    }
-
-    #[test]
-    fn test_recover() {
-        let mut csprng = OsRng {};
-        let kp = Keypair::generate(&mut csprng);
-        let sealed_data = keypair_seal::seal(&mut csprng, &kp).unwrap();
-        let mut backup_key = vec![0u8; 16];
-        csprng.fill_bytes(&mut backup_key);
-        let bk1 = CloudWrapKey::new(backup_key.clone()).unwrap();
-        let bk2 = CloudWrapKey::new(backup_key).unwrap();
-        let backup_data = keypair_seal::cloud_backup(&mut csprng, bk1, &kp).unwrap();
-        let recovered_sealed_data =
-            keypair_seal::seal_recover_cloud_backup(&mut csprng, bk2, backup_data).unwrap();
-        assert_eq!(
-            keypair_seal::unseal(&sealed_data).unwrap().public,
-            kp.public
-        );
-        assert_eq!(
-            keypair_seal::unseal(&recovered_sealed_data).unwrap().public,
             kp.public
         );
     }
