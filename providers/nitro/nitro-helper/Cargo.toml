@@ -6,19 +6,20 @@ edition = "2018"
 
 [features]
 default = ["main"]
-main = ["mz_rusoto_credential", "mz_rusoto_kms", "mz_rusoto_core", "sysinfo"]
+main = ["sysinfo", "aws-sdk-kms", "smithy-types", "reqwest"]
 
 [dependencies]
 anomaly = "0.2"
+aws-sdk-kms = { git = "https://github.com/awslabs/aws-sdk-rust.git", tag = "v0.0.7-alpha", optional = true}
+smithy-types = {git = "https://github.com/awslabs/aws-sdk-rust.git", tag = "v0.0.7-alpha", optional = true}
 bytes = "= 0.5"
 chrono = "0.4"
 ed25519 = { version = "1", features = [ "serde" ] }
 ed25519-dalek = "1"
-mz_rusoto_credential = { version = "0.46", optional = true }
-mz_rusoto_kms = { version = "0.46", optional = true }
-mz_rusoto_core = { version = "0.46", optional = true }
 nix = "0.21"
 rand_core = { version = "0.6", features = [ "std" ] }
+reqwest = { version = "0.11", features = ["blocking", "json"], optional = true}
+secrecy = { version = "0.7", features = ["alloc", "serde"] }
 serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 structopt = "0.3"
@@ -28,7 +29,7 @@ tempfile = "3"
 tendermint = { version = "0.19" }
 thiserror = "1"
 tmkms-light = { path = "../../.." }
-tokio = { version = "= 0.2", features = [ "rt-core", "time" ] }
+tokio = { version = "1", features = [ "rt" ] }
 toml = "0.5"
 tracing = "0.1"
 tracing-subscriber = "0.2"

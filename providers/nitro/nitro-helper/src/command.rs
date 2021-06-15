@@ -1,10 +1,9 @@
 use crate::config::NitroSignOpt;
 use crate::enclave_log_server::LogServer;
-use crate::key_utils::generate_key;
+use crate::key_utils::{credential, generate_key};
 use crate::proxy::Proxy;
-use crate::shared::{AwsCredentials, NitroConfig};
+use crate::shared::NitroConfig;
 use crate::state::StateSyncer;
-use rusoto_credential::{InstanceMetadataProvider, ProvideAwsCredentials};
 use std::{fs, path::PathBuf};
 use sysinfo::{ProcessExt, SystemExt};
 use tendermint::net;
@@ -30,6 +29,11 @@ pub fn init(
     let t = toml::to_string_pretty(&config)
         .map_err(|e| format!("failed to create a config in toml: {:?}", e))?;
     fs::write(cp, t).map_err(|e| format!("failed to write a config: {:?}", e))?;
+    let credentials = if let Some(credentials) = config.credentials {
+        credentials
+    } else {
+        credential::get_credentials()?
+    };
     fs::create_dir_all(
         config
             .sealed_consensus_key_path
@@ -47,12 +51,13 @@ pub fn init(
     let pubkey = generate_key(
         config.sealed_consensus_key_path,
         &config.aws_region,
+        credentials.clone(),
         kms_key_id.clone(),
     )
     .map_err(|e| format!("failed to generate a key: {:?}", e))?;
     print_pubkey(bech32_prefix, pubkey_display, pubkey);
     if let Some(id_path) = config.sealed_id_key_path {
-        generate_key(id_path, &config.aws_region, kms_key_id)
+        generate_key(id_path, &config.aws_region, credentials, kms_key_id)
             .map_err(|e| format!("failed to generate a key: {:?}", e))?;
     }
     Ok(())
@@ -87,20 +92,7 @@ pub fn start(config_path: Option<PathBuf>, cid: Option<u32>) -> Result<(), Strin
         let credentials = if let Some(credentials) = config.credentials {
             credentials
         } else {
-            let mut rt = tokio::runtime::Runtime::new()
-                .map_err(|e| format!("failed to get tokio runtime: {:?}", e))?;
-            let credentials = rt
-                .block_on(async move { InstanceMetadataProvider::new().credentials().await })
-                .map_err(|e| format!("failed to obtain AWS credentials: {:?}", e))?;
-            AwsCredentials {
-                aws_key_id: credentials.aws_access_key_id().to_owned(),
-                aws_secret_key: credentials.aws_secret_access_key().to_owned(),
-                aws_session_token: credentials
-                    .token()
-                    .as_ref()
-                    .ok_or_else(|| "failed to get a session token".to_owned())?
-                    .to_owned(),
-            }
+            credential::get_credentials()?
         };
         let peer_id = match &config.address {
             net::Address::Tcp { peer_id, .. } => *peer_id,

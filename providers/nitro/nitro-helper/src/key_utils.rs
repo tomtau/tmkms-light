@@ -1,45 +1,108 @@
-use bytes::Bytes;
+use crate::shared::AwsCredentials;
+use aws_sdk_kms::config::Config;
+use aws_sdk_kms::Credentials as KmsCredentials;
+use aws_sdk_kms::{Client as KmsClient, Region};
 use ed25519_dalek::{Keypair, PublicKey};
 use rand_core::OsRng;
-use rusoto_core::{region::Region, HttpClient};
-use rusoto_credential::InstanceMetadataProvider;
-use rusoto_kms::{EncryptRequest, Kms, KmsClient};
-use std::str::FromStr;
 use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
+use tokio::runtime::Builder;
+use zeroize::Zeroizing;
+
+// TODO: use aws-rust-sdk after the issue fixed
+// https://github.com/awslabs/aws-sdk-rust/issues/97
+pub(crate) mod credential {
+    use crate::shared::AwsCredentials;
+    use secrecy::{ExposeSecret, SecretString};
+    use serde::Deserialize;
+
+    const AWS_CREDENTIALS_PROVIDER_IP: &str = "169.254.169.254";
+    const AWS_CREDENTIALS_PROVIDER_PATH: &str = "latest/meta-data/iam/security-credentials";
+
+    #[derive(Clone, Debug, Deserialize)]
+    pub struct AwsCredentialsResponse {
+        #[serde(alias = "AccessKeyId")]
+        aws_key_id: SecretString,
+        #[serde(alias = "SecretAccessKey")]
+        aws_secret_key: SecretString,
+        #[serde(default, alias = "Token")]
+        aws_session_token: Option<SecretString>,
+    }
+
+    impl From<AwsCredentialsResponse> for AwsCredentials {
+        fn from(r: AwsCredentialsResponse) -> AwsCredentials {
+            AwsCredentials {
+                aws_key_id: r.aws_key_id.expose_secret().into(),
+                aws_secret_key: r.aws_secret_key.expose_secret().into(),
+                // note: the token should not be none so that unwrap can be used
+                aws_session_token: r.aws_session_token.unwrap().expose_secret().into(),
+            }
+        }
+    }
+
+    /// Gets the role name to get credentials for using the IAM Metadata Service (169.254.169.254).
+    pub fn get_credentials() -> Result<AwsCredentials, String> {
+        let role_name_address = format!(
+            "http://{}/{}/",
+            AWS_CREDENTIALS_PROVIDER_IP, AWS_CREDENTIALS_PROVIDER_PATH
+        );
+        let role_name = reqwest::blocking::get(role_name_address)
+            .map_err(|e| format!("get role name error: {:?}", e))?
+            .text()
+            .map_err(|e| format!("get role name result failed: {:?}", e))?;
+        let credentials_provider_url = format!(
+            "http://{}/{}/{}",
+            AWS_CREDENTIALS_PROVIDER_IP, AWS_CREDENTIALS_PROVIDER_PATH, role_name
+        );
+        let credentials: AwsCredentialsResponse = reqwest::blocking::get(credentials_provider_url)
+            .map_err(|e| format!("get credentials error: {:?}", e))?
+            .json()
+            .map_err(|e| format!("get credentials result failed: {:?}", e))?;
+        if credentials.aws_session_token.is_none() {
+            return Err("aws session is empty in credentials".to_string());
+        }
+        Ok(credentials.into())
+    }
+}
 
 /// Generates key and encrypts with AWS KMS at the given path
-/// TODO: generate in NE after this is merged https://github.com/aws/aws-nitro-enclaves-sdk-c/pull/25
+/// TODO: generate in NE after this is merged https://github.com/aws/aws-nitro-enclaves-sdk-c/pull/55
 pub fn generate_key(
     path: impl AsRef<Path>,
     region: &str,
-    key_id: String,
+    credentials: AwsCredentials,
+    kms_key_id: String,
 ) -> Result<PublicKey, String> {
-    let region = Region::from_str(region).map_err(|e| format!("invalid region: {}", e))?;
+    let credientials = KmsCredentials::from_keys(
+        credentials.aws_key_id,
+        &credentials.aws_secret_key,
+        Some(credentials.aws_session_token),
+    );
     let mut csprng = OsRng {};
-    let keypair: Keypair = Keypair::generate(&mut csprng);
+    let keypair = Keypair::generate(&mut csprng);
     let public = keypair.public;
-    let mut rt = tokio::runtime::Runtime::new()
-        .map_err(|err| format!("Failed to init tokio runtime: {}", err))?;
-    let ciphertext = rt
-        .block_on(async move {
-            let provider = InstanceMetadataProvider::new();
-            let dispatcher = HttpClient::new()
-                .map_err(|e| format!("failed to create request dispatcher {}", e))?;
-            let client = KmsClient::new_with(dispatcher, provider, region);
-            client
-                .encrypt(EncryptRequest {
-                    encryption_context: None,
-                    grant_tokens: None,
-                    encryption_algorithm: None,
-                    key_id,
-                    plaintext: Bytes::copy_from_slice(keypair.secret.as_bytes()),
-                })
-                .await
-                .map_err(|err| format!("Failed to obtain ciphertext from instance: {}", err))
-        })?
-        .ciphertext_blob
-        .ok_or_else(|| "failed to obtain ciphertext blob".to_owned())?;
+    let private_key = Zeroizing::new(keypair.secret.as_bytes().to_vec());
+    let privkey_blob = smithy_types::Blob::new(<Vec<u8> as AsRef<[u8]>>::as_ref(&private_key));
+    let kms_config = Config::builder()
+        .region(Region::new(region.to_string()))
+        .credentials_provider(credientials)
+        .build();
 
+    let client = KmsClient::from_conf(kms_config);
+    let generator = client
+        .encrypt()
+        .set_plaintext(Some(privkey_blob))
+        .set_key_id(Some(kms_key_id));
+
+    let rt = Builder::new_current_thread()
+        .build()
+        .map_err(|err| format!("Failed to init tokio runtime: {}", err))?;
+    let output = rt
+        .block_on(generator.send())
+        .map_err(|e| format!("send to mks to encrypt error: {:?}", e))?;
+    let ciphertext = output
+        .ciphertext_blob
+        .ok_or_else(|| "empty private key ciphertext in response".to_string())?
+        .into_inner();
     OpenOptions::new()
         .create(true)
         .write(true)
