@@ -12,11 +12,15 @@ use zeroize::Zeroizing;
 // https://github.com/awslabs/aws-sdk-rust/issues/97
 pub(crate) mod credential {
     use crate::shared::AwsCredentials;
+    use reqwest::blocking::Client;
+    use reqwest::header::{HeaderName, HeaderValue};
     use secrecy::{ExposeSecret, SecretString};
     use serde::Deserialize;
+    use std::str::FromStr;
 
     const AWS_CREDENTIALS_PROVIDER_IP: &str = "169.254.169.254";
     const AWS_CREDENTIALS_PROVIDER_PATH: &str = "latest/meta-data/iam/security-credentials";
+    const AWS_TOKEN_PATH: &str = "latest/api/token";
 
     #[derive(Clone, Debug, Deserialize)]
     pub struct AwsCredentialsResponse {
@@ -39,13 +43,43 @@ pub(crate) mod credential {
         }
     }
 
-    /// Gets the role name to get credentials for using the IAM Metadata Service (169.254.169.254).
+    /// get credentials from Aws Instance Metadata Service Version 2
+    /// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
     pub fn get_credentials() -> Result<AwsCredentials, String> {
+        let token_address = format!("http://{}/{}/", AWS_CREDENTIALS_PROVIDER_IP, AWS_TOKEN_PATH);
+        let client = Client::new();
+        let header_key = HeaderName::from_str("X-aws-ec2-metadata-token-ttl-seconds").unwrap();
+        let header_value = HeaderValue::from_str("30").unwrap();
+        let token_response = client
+            .put(token_address)
+            .header(header_key, header_value)
+            .send()
+            .map_err(|e| format!("get aws token error: {:?}", e))?;
+
+        let token = if token_response.status().is_success() {
+            token_response
+                .text()
+                .map_err(|e| format!("can't get token: {:?}", e))?
+        } else {
+            return Err(format!(
+                "get aws sdk token failed, error code: {}",
+                token_response.status()
+            ));
+        };
+
+        let header_token_name = HeaderName::from_str("X-aws-ec2-metadata-token").unwrap();
+        let header_token_value =
+            HeaderValue::from_str(&token).map_err(|_| "invalid token".to_string())?;
+
+        /// Gets the role name to get credentials
         let role_name_address = format!(
             "http://{}/{}/",
             AWS_CREDENTIALS_PROVIDER_IP, AWS_CREDENTIALS_PROVIDER_PATH
         );
-        let role_name = reqwest::blocking::get(role_name_address)
+        let role_name = client
+            .get(role_name_address)
+            .header(header_token_name.clone(), header_token_value.clone())
+            .send()
             .map_err(|e| format!("get role name error: {:?}", e))?
             .text()
             .map_err(|e| format!("get role name result failed: {:?}", e))?;
@@ -53,7 +87,10 @@ pub(crate) mod credential {
             "http://{}/{}/{}",
             AWS_CREDENTIALS_PROVIDER_IP, AWS_CREDENTIALS_PROVIDER_PATH, role_name
         );
-        let credentials: AwsCredentialsResponse = reqwest::blocking::get(credentials_provider_url)
+        let credentials: AwsCredentialsResponse = client
+            .get(credentials_provider_url)
+            .header(header_token_name, header_token_value)
+            .send()
             .map_err(|e| format!("get credentials error: {:?}", e))?
             .json()
             .map_err(|e| format!("get credentials result failed: {:?}", e))?;
