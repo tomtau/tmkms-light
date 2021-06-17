@@ -3,6 +3,8 @@ mod state;
 
 use anomaly::format_err;
 use ed25519_dalek as ed25519;
+use ed25519_dalek::Keypair;
+use rand_core::OsRng;
 use std::io;
 use std::os::unix::io::AsRawFd;
 use std::thread;
@@ -15,10 +17,10 @@ use tmkms_light::config::validator::ValidatorConfig;
 use tmkms_light::connection::{Connection, PlainConnection};
 use tmkms_light::error::{
     Error,
-    ErrorKind::{AccessError, InvalidKey, IoError},
+    ErrorKind::{AccessError, InvalidKey, IoError, ParseError},
 };
-use tmkms_light::utils::read_u16_payload;
-use tmkms_nitro_helper::{NitroConfig, VSOCK_HOST_CID};
+use tmkms_light::utils::{read_u16_payload, write_u16_payload};
+use tmkms_nitro_helper::{NitroConfig, NitroRequest, NitroResponse, VSOCK_HOST_CID};
 use tracing::{error, info, trace, warn};
 use vsock::{SockAddr, VsockStream};
 use zeroize::Zeroizing;
@@ -97,13 +99,12 @@ pub fn get_connection(
 }
 
 /// a simple req-rep handling loop
-pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
-    let json_raw = read_u16_payload(&mut config_stream)
+pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
+    let json_raw = read_u16_payload(&mut stream)
         .map_err(|_e| format_err!(IoError, "failed to read config"))?;
-    let mconfig = serde_json::from_slice(&json_raw);
-    match mconfig {
-        Ok(config) => {
-            let config: NitroConfig = config;
+    let request: Result<NitroRequest, _> = serde_json::from_slice(&json_raw);
+    match request {
+        Ok(NitroRequest::Config(config)) => {
             let key_bytes = Zeroizing::new(
                 aws_ne_sys::kms_decrypt(
                     config.aws_region.as_bytes(),
@@ -163,6 +164,29 @@ pub fn entry(mut config_stream: VsockStream) -> Result<(), Error> {
                 let conn: Box<dyn Connection> = get_connection(&config, id_keypair.as_ref());
                 session.reset_connection(conn);
             }
+        }
+        Ok(NitroRequest::Keygen(keygen_config)) => {
+            let mut csprng = OsRng {};
+            let keypair = Keypair::generate(&mut csprng);
+            let public = keypair.public;
+            let response = match aws_ne_sys::kms_encrypt(
+                keygen_config.aws_region.as_bytes(),
+                keygen_config.credentials.aws_key_id.as_bytes(),
+                keygen_config.credentials.aws_secret_key.as_bytes(),
+                keygen_config.credentials.aws_session_token.as_bytes(),
+                keygen_config.kms_key_id.as_bytes(),
+                keypair.secret.as_bytes(),
+            ) {
+                Ok(cipher_privkey) => {
+                    NitroResponse::CipherKeypair((cipher_privkey, public.as_bytes().to_vec()))
+                }
+                Err(e) => NitroResponse::Error(format!("{:?}", e)),
+            };
+
+            let json = serde_json::to_string(&response)
+                .map_err(|e| format_err!(ParseError, "serde keygen response error: {:?}", e))?;
+            write_u16_payload(&mut stream, json.as_bytes())
+                .map_err(|_e| format_err!(IoError, "failed to send keypair response"))?;
         }
         Err(e) => {
             error!("config error: {}", e);

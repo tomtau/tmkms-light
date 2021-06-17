@@ -1,12 +1,11 @@
 use crate::shared::AwsCredentials;
-use aws_sdk_kms::config::Config;
-use aws_sdk_kms::Credentials as KmsCredentials;
-use aws_sdk_kms::{Client as KmsClient, Region};
-use ed25519_dalek::{Keypair, PublicKey};
-use rand_core::OsRng;
+use crate::shared::{NitroKeygenConfig, NitroRequest};
+
+use ed25519_dalek::PublicKey;
 use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
-use tokio::runtime::Builder;
-use zeroize::Zeroizing;
+use tmkms_light::utils::{read_u16_payload, write_u16_payload};
+use tmkms_nitro_helper::NitroResponse;
+use vsock::SockAddr;
 
 // TODO: use aws-rust-sdk after the issue fixed
 // https://github.com/awslabs/aws-sdk-rust/issues/97
@@ -71,7 +70,6 @@ pub(crate) mod credential {
         let header_token_value =
             HeaderValue::from_str(&token).map_err(|_| "invalid token".to_string())?;
 
-        /// Gets the role name to get credentials
         let role_name_address = format!(
             "http://{}/{}/",
             AWS_CREDENTIALS_PROVIDER_IP, AWS_CREDENTIALS_PROVIDER_PATH
@@ -102,51 +100,49 @@ pub(crate) mod credential {
 }
 
 /// Generates key and encrypts with AWS KMS at the given path
-/// TODO: generate in NE after this is merged https://github.com/aws/aws-nitro-enclaves-sdk-c/pull/55
 pub fn generate_key(
+    cid: u32,
+    port: u32,
     path: impl AsRef<Path>,
     region: &str,
     credentials: AwsCredentials,
     kms_key_id: String,
 ) -> Result<PublicKey, String> {
-    let credientials = KmsCredentials::from_keys(
-        credentials.aws_key_id,
-        &credentials.aws_secret_key,
-        Some(credentials.aws_session_token),
-    );
-    let mut csprng = OsRng {};
-    let keypair = Keypair::generate(&mut csprng);
-    let public = keypair.public;
-    let private_key = Zeroizing::new(keypair.secret.as_bytes().to_vec());
-    let privkey_blob = smithy_types::Blob::new(<Vec<u8> as AsRef<[u8]>>::as_ref(&private_key));
-    let kms_config = Config::builder()
-        .region(Region::new(region.to_string()))
-        .credentials_provider(credientials)
-        .build();
+    let keygen_request = NitroKeygenConfig {
+        credentials,
+        kms_key_id,
+        aws_region: region.into(),
+    };
 
-    let client = KmsClient::from_conf(kms_config);
-    let generator = client
-        .encrypt()
-        .set_plaintext(Some(privkey_blob))
-        .set_key_id(Some(kms_key_id));
+    let request = NitroRequest::Keygen(keygen_request);
+    let addr = SockAddr::new_vsock(cid, port);
+    let mut socket = vsock::VsockStream::connect(&addr).map_err(|e| {
+        format!(
+            "failed to connect to the enclave to generate key pair: {:?}",
+            e
+        )
+    })?;
+    let request_raw = serde_json::to_vec(&request)
+        .map_err(|e| format!("failed to serialize the keygen request: {:?}", e))?;
+    write_u16_payload(&mut socket, &request_raw)
+        .map_err(|e| format!("failed to write the config: {:?}", e))?;
+    // get the response
+    let json_raw =
+        read_u16_payload(&mut socket).map_err(|_e| "failed to read config".to_string())?;
+    let response: NitroResponse = serde_json::from_slice(&json_raw)
+        .map_err(|e| format!("failed to get keygen response from enclave: {:?}", e))?;
 
-    let rt = Builder::new_current_thread()
-        .build()
-        .map_err(|err| format!("Failed to init tokio runtime: {}", err))?;
-    let output = rt
-        .block_on(generator.send())
-        .map_err(|e| format!("send to mks to encrypt error: {:?}", e))?;
-    let ciphertext = output
-        .ciphertext_blob
-        .ok_or_else(|| "empty private key ciphertext in response".to_string())?
-        .into_inner();
+    let (cipher_privkey, pubkey) = match response {
+        NitroResponse::Error(e) => Err(e),
+        NitroResponse::CipherKeypair((cipher, public)) => Ok((cipher, public)),
+    }?;
     OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
         .mode(0o600)
         .open(path.as_ref())
-        .and_then(|mut file| file.write_all(&*ciphertext))
+        .and_then(|mut file| file.write_all(&cipher_privkey))
         .map_err(|e| format!("couldn't write `{}`: {}", path.as_ref().display(), e))?;
-    Ok(public)
+    PublicKey::from_bytes(&pubkey).map_err(|e| format!("Invalid pubkey key: {:?}", e))
 }

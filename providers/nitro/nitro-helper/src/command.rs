@@ -2,7 +2,7 @@ use crate::config::NitroSignOpt;
 use crate::enclave_log_server::LogServer;
 use crate::key_utils::{credential, generate_key};
 use crate::proxy::Proxy;
-use crate::shared::NitroConfig;
+use crate::shared::{NitroConfig, NitroRequest};
 use crate::state::StateSyncer;
 use std::{fs, path::PathBuf};
 use sysinfo::{ProcessExt, SystemExt};
@@ -20,6 +20,7 @@ pub fn init(
     bech32_prefix: Option<String>,
     aws_region: String,
     kms_key_id: String,
+    cid: Option<u32>,
 ) -> Result<(), String> {
     let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     let config = NitroSignOpt {
@@ -29,6 +30,11 @@ pub fn init(
     let t = toml::to_string_pretty(&config)
         .map_err(|e| format!("failed to create a config in toml: {:?}", e))?;
     fs::write(cp, t).map_err(|e| format!("failed to write a config: {:?}", e))?;
+    let (cid, port) = if let Some(cid) = cid {
+        (cid, config.enclave_config_port)
+    } else {
+        (config.enclave_config_cid, config.enclave_config_port)
+    };
     let credentials = if let Some(credentials) = config.credentials {
         credentials
     } else {
@@ -49,6 +55,8 @@ pub fn init(
     )
     .map_err(|e| format!("failed to create dirs for state storage: {:?}", e))?;
     let pubkey = generate_key(
+        cid,
+        port,
         config.sealed_consensus_key_path,
         &config.aws_region,
         credentials.clone(),
@@ -57,8 +65,15 @@ pub fn init(
     .map_err(|e| format!("failed to generate a key: {:?}", e))?;
     print_pubkey(bech32_prefix, pubkey_display, pubkey);
     if let Some(id_path) = config.sealed_id_key_path {
-        generate_key(id_path, &config.aws_region, credentials, kms_key_id)
-            .map_err(|e| format!("failed to generate a key: {:?}", e))?;
+        generate_key(
+            cid,
+            port,
+            id_path,
+            &config.aws_region,
+            credentials,
+            kms_key_id,
+        )
+        .map_err(|e| format!("failed to generate a key: {:?}", e))?;
     }
     Ok(())
 }
@@ -136,7 +151,8 @@ pub fn start(config_path: Option<PathBuf>, cid: Option<u32>) -> Result<(), Strin
                 e
             )
         })?;
-        let config_raw = serde_json::to_vec(&enclave_config)
+        let request = NitroRequest::Config(enclave_config);
+        let config_raw = serde_json::to_vec(&request)
             .map_err(|e| format!("failed to serialize the config: {:?}", e))?;
         write_u16_payload(&mut socket, &config_raw)
             .map_err(|e| format!("failed to write the config: {:?}", e))?;

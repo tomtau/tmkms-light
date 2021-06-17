@@ -28,6 +28,29 @@ pub struct NitroConfig {
     pub aws_region: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NitroKeygenConfig {
+    /// AWS credentials -- if not set, they'll be obtained from IAM
+    pub credentials: AwsCredentials,
+    /// AWS key id
+    pub kms_key_id: String,
+    /// AWS region
+    pub aws_region: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum NitroRequest {
+    Keygen(NitroKeygenConfig),
+    Config(NitroConfig),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum NitroResponse {
+    // (cipher_privkey, public_key)
+    CipherKeypair((Vec<u8>, Vec<u8>)),
+    Error(String),
+}
+
 /// Credentials, generally obtained from parent instance IAM
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

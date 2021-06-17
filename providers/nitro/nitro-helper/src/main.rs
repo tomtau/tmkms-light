@@ -30,6 +30,8 @@ enum TmkmsLight {
         aws_region: String,
         #[structopt(short)]
         kms_key_id: String,
+        #[structopt(long)]
+        cid: Option<u32>,
     },
     #[structopt(name = "start", about = "start tmkms process")]
     /// start tmkms process (push config + start up proxy and state persistence)
@@ -50,12 +52,14 @@ fn main() {
             bech32_prefix,
             aws_region,
             kms_key_id,
+            cid,
         } => command::init(
             config_path,
             pubkey_display,
             bech32_prefix,
             aws_region,
             kms_key_id,
+            cid,
         ),
         TmkmsLight::Start { config_path, cid } => command::start(config_path, cid),
     };
