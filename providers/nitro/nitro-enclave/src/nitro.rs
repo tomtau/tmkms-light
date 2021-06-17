@@ -4,7 +4,10 @@ mod state;
 use anomaly::format_err;
 use ed25519_dalek as ed25519;
 use ed25519_dalek::Keypair;
+use nsm_driver::{nsm_exit, nsm_init, nsm_process_request};
+use nsm_io::{Request, Response};
 use rand_core::OsRng;
+use serde_bytes::ByteBuf;
 use std::io;
 use std::os::unix::io::AsRawFd;
 use std::thread;
@@ -20,10 +23,12 @@ use tmkms_light::error::{
     ErrorKind::{AccessError, InvalidKey, IoError, ParseError},
 };
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
-use tmkms_nitro_helper::{NitroConfig, NitroRequest, NitroResponse, VSOCK_HOST_CID};
+use tmkms_nitro_helper::{
+    NitroConfig, NitroKeygenResponse, NitroRequest, NitroResponse, VSOCK_HOST_CID,
+};
 use tracing::{error, info, trace, warn};
 use vsock::{SockAddr, VsockStream};
-use zeroize::Zeroizing;
+use zeroize::{Zeroize, Zeroizing};
 
 fn get_secret_connection(
     vsock_port: u32,
@@ -100,11 +105,12 @@ pub fn get_connection(
 
 /// a simple req-rep handling loop
 pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
+    let nsm_fd = nsm_init();
     let json_raw = read_u16_payload(&mut stream)
         .map_err(|_e| format_err!(IoError, "failed to read config"))?;
     let request: Result<NitroRequest, _> = serde_json::from_slice(&json_raw);
     match request {
-        Ok(NitroRequest::Config(config)) => {
+        Ok(NitroRequest::Start(config)) => {
             let key_bytes = Zeroizing::new(
                 aws_ne_sys::kms_decrypt(
                     config.aws_region.as_bytes(),
@@ -167,9 +173,20 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
         }
         Ok(NitroRequest::Keygen(keygen_config)) => {
             let mut csprng = OsRng {};
-            let keypair = Keypair::generate(&mut csprng);
+            let mut keypair = Keypair::generate(&mut csprng);
             let public = keypair.public;
-            let response = match aws_ne_sys::kms_encrypt(
+            let pubkeyb64 = String::from_utf8(subtle_encoding::base64::encode(&public))
+                .map_err(|e| format_err!(IoError, "base64 encoding error: {:?}", e))?;
+            let keyidb64 =
+                String::from_utf8(subtle_encoding::base64::encode(&keygen_config.kms_key_id))
+                    .map_err(|e| format_err!(IoError, "base64 encoding error: {:?}", e))?;
+
+            let claim = format!(
+                "{{\"pubkey\":\"{}\",\"key_id\":\"{}\"}}",
+                pubkeyb64, keyidb64
+            );
+            let user_data = Some(ByteBuf::from(claim));
+            let response: NitroResponse = match aws_ne_sys::kms_encrypt(
                 keygen_config.aws_region.as_bytes(),
                 keygen_config.credentials.aws_key_id.as_bytes(),
                 keygen_config.credentials.aws_secret_key.as_bytes(),
@@ -177,12 +194,30 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                 keygen_config.kms_key_id.as_bytes(),
                 keypair.secret.as_bytes(),
             ) {
-                Ok(cipher_privkey) => {
-                    NitroResponse::CipherKeypair((cipher_privkey, public.as_bytes().to_vec()))
+                Ok(encrypted_secret) => {
+                    let req = Request::Attestation {
+                        user_data,
+                        // as this is one-off attestation on generation,
+                        // no need here (this may useful in other scenarios)
+                        nonce: None,
+                        // this field is meant for encryptions (e.g. when AWS KMS
+                        // sends a response to the enclave),
+                        // so it's used in `aws_ne_sys`, but not here
+                        public_key: None,
+                    };
+                    let att = nsm_process_request(nsm_fd, req);
+                    match att {
+                        Response::Attestation { document } => Ok(NitroKeygenResponse {
+                            encrypted_secret,
+                            public_key: public.as_bytes().to_vec(),
+                            attestation_doc: document,
+                        }),
+                        _ => Err("failed to obtain an attestation document".to_owned()),
+                    }
                 }
-                Err(e) => NitroResponse::Error(format!("{:?}", e)),
+                Err(e) => Err(format!("{:?}", e)),
             };
-
+            keypair.secret.zeroize();
             let json = serde_json::to_string(&response)
                 .map_err(|e| format_err!(ParseError, "serde keygen response error: {:?}", e))?;
             write_u16_payload(&mut stream, json.as_bytes())
@@ -192,6 +227,7 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
             error!("config error: {}", e);
         }
     }
+    nsm_exit(nsm_fd);
 
     Ok(())
 }

@@ -54,7 +54,7 @@ pub fn init(
             .ok_or_else(|| "cannot create a dir in a root directory".to_owned())?,
     )
     .map_err(|e| format!("failed to create dirs for state storage: {:?}", e))?;
-    let pubkey = generate_key(
+    let (pubkey, attestation_doc) = generate_key(
         cid,
         port,
         config.sealed_consensus_key_path,
@@ -64,6 +64,10 @@ pub fn init(
     )
     .map_err(|e| format!("failed to generate a key: {:?}", e))?;
     print_pubkey(bech32_prefix, pubkey_display, pubkey);
+    let encoded_attdoc = String::from_utf8(subtle_encoding::base64::encode(&attestation_doc))
+        .map_err(|e| format!("enconding attestation doc: {:?}", e))?;
+    println!("Nitro Enclave attestation:\n{}", &encoded_attdoc);
+
     if let Some(id_path) = config.sealed_id_key_path {
         generate_key(
             cid,
@@ -153,7 +157,7 @@ pub fn start(
                 e
             )
         })?;
-        let request = NitroRequest::Config(enclave_config);
+        let request = NitroRequest::Start(enclave_config);
         let config_raw = serde_json::to_vec(&request)
             .map_err(|e| format!("failed to serialize the config: {:?}", e))?;
         write_u16_payload(&mut socket, &config_raw)

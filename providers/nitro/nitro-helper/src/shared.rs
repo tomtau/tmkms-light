@@ -28,6 +28,7 @@ pub struct NitroConfig {
     pub aws_region: String,
 }
 
+/// configuration sent during key generation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NitroKeygenConfig {
     /// AWS credentials -- if not set, they'll be obtained from IAM
@@ -38,18 +39,28 @@ pub struct NitroKeygenConfig {
     pub aws_region: String,
 }
 
+/// types of initial requests sent to NE
 #[derive(Debug, Serialize, Deserialize)]
 pub enum NitroRequest {
+    /// generate a key
     Keygen(NitroKeygenConfig),
-    Config(NitroConfig),
+    /// start up TMKMS processing
+    Start(NitroConfig),
 }
 
+/// response from key generation
 #[derive(Debug, Serialize, Deserialize)]
-pub enum NitroResponse {
-    // (cipher_privkey, public_key)
-    CipherKeypair((Vec<u8>, Vec<u8>)),
-    Error(String),
+pub struct NitroKeygenResponse {
+    /// payload returned from AWS KMS
+    pub encrypted_secret: Vec<u8>,
+    /// public key for consensus or P2P
+    pub public_key: Vec<u8>,
+    /// attestation payload (COSE_Sign1) for the public key + encryption key id
+    pub attestation_doc: Vec<u8>,
 }
+
+/// response from the enclave
+pub type NitroResponse = Result<NitroKeygenResponse, String>;
 
 /// Credentials, generally obtained from parent instance IAM
 #[derive(Debug, Clone, Serialize, Deserialize)]
