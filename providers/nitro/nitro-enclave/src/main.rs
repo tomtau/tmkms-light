@@ -1,5 +1,5 @@
 use tracing::Level;
-use tracing::{error, info, warn, Subscriber};
+use tracing::{error, info, warn};
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use vsock::{SockAddr, VsockListener};
