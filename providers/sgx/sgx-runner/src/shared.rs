@@ -177,7 +177,7 @@ impl fmt::Display for CloudBackupSeal {
             &self.wrapped_cloud_sealing_key[..],
         ]
         .concat();
-        let full_str = base64::encode_config(&full, base64::URL_SAFE);
+        let full_str = base64::encode(&full);
         write!(f, "{}", full_str)
     }
 }
@@ -186,7 +186,7 @@ impl FromStr for CloudBackupSeal {
     type Err = base64::DecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = base64::decode_config(s, base64::URL_SAFE)?;
+        let bytes = base64::decode(s)?;
         CloudBackupSeal::new(bytes).ok_or(base64::DecodeError::InvalidLength)
     }
 }
