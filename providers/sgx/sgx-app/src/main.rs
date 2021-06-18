@@ -3,17 +3,22 @@ mod sgx_app;
 
 #[cfg(target_env = "sgx")]
 fn main() -> std::io::Result<()> {
-    let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(tracing::Level::INFO)
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     let mut args = std::env::args();
     let command = args.next();
+    let log_level = match args.next() {
+        None => tracing::Level::INFO,
+        Some(s) => Level::from_str(s).unwrap(),
+    };
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(log_level)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
     if command.is_none() {
         tracing::error!("no enclave command provided");
         return Err(std::io::ErrorKind::Other.into());
     }
+
     let request = serde_json::from_str(&command.unwrap());
     if request.is_err() {
         tracing::error!("invalid enclave command provided");

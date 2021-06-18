@@ -79,7 +79,11 @@ pub fn init(
 }
 
 /// push config to enclave, start up a proxy (if needed) + state syncer
-pub fn start(config_path: Option<PathBuf>, cid: Option<u32>) -> Result<(), String> {
+pub fn start(
+    config_path: Option<PathBuf>,
+    cid: Option<u32>,
+    log_level: Level,
+) -> Result<(), String> {
     let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     if !cp.exists() {
         Err("missing tmkms.toml file".to_owned())
@@ -94,9 +98,7 @@ pub fn start(config_path: Option<PathBuf>, cid: Option<u32>) -> Result<(), Strin
             return Err("vsock-proxy not running".to_owned());
         }
 
-        let subscriber = FmtSubscriber::builder()
-            .with_max_level(Level::INFO)
-            .finish();
+        let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
 
         tracing::subscriber::set_global_default(subscriber)
             .map_err(|e| format!("setting default subscriber failed: {:?}", e))?;

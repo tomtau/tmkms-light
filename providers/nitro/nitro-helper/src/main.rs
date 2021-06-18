@@ -9,6 +9,7 @@ mod state;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tmkms_light::utils::PubkeyDisplay;
+use tracing::Level;
 
 /// Helper sub-commands
 #[derive(Debug, StructOpt)]
@@ -40,6 +41,10 @@ enum TmkmsLight {
         config_path: Option<PathBuf>,
         #[structopt(long)]
         cid: Option<u32>,
+        #[structopt(short, parse(from_occurrences))]
+        /// log level, default: info, -v: info, -vv: debug, -vvv: trace
+        #[structopt(short, parse(from_occurrences))]
+        v: u32,
     },
 }
 
@@ -61,7 +66,18 @@ fn main() {
             kms_key_id,
             cid,
         ),
-        TmkmsLight::Start { config_path, cid } => command::start(config_path, cid),
+        TmkmsLight::Start {
+            config_path,
+            cid,
+            v,
+        } => {
+            let log_level = match v {
+                0 | 1 => Level::INFO,
+                2 => Level::DEBUG,
+                _ => Level::TRACE,
+            };
+            command::start(config_path, cid, log_level)
+        }
     };
     if let Err(e) = result {
         eprintln!("{}", e);

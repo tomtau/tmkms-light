@@ -16,6 +16,7 @@ pub fn keywrap(
     enclave_path: PathBuf,
     sealed_output_path: PathBuf,
     dcap: bool,
+    log_level: String,
 ) -> Result<(), String> {
     let targetinfo = if dcap {
         if dcap_ql::is_loaded() {
@@ -32,7 +33,7 @@ pub fn keywrap(
         .map_err(|e| format!("failed to convert request to json: {:?}", e))?;
     let (state_syncer, _, state_stream) = TmkmsSgxSigner::get_state_syncer("/tmp/state.json")
         .map_err(|e| format!("state persistence error: {:?}", e))?;
-    let enclave_args: Vec<&[u8]> = vec![request_bytes.as_ref()];
+    let enclave_args: Vec<&[u8]> = vec![request_bytes.as_ref(), log_level.as_bytes()];
     let runner = TmkmsSgxSigner::launch_enclave_app(
         &enclave_path,
         None,
@@ -92,6 +93,7 @@ pub fn init(
     wrap_backup_key_path: Option<PathBuf>,
     external_cloud_key_path: Option<PathBuf>,
     key_backup_data_path: Option<PathBuf>,
+    log_level: String,
 ) -> Result<(), String> {
     let cloud_backup = match (wrap_backup_key_path, external_cloud_key_path) {
         (Some(p1), Some(p2)) => {
@@ -142,7 +144,7 @@ pub fn init(
     debug!("launching enclave");
     let (state_syncer, _, state_stream) = TmkmsSgxSigner::get_state_syncer(&config.state_file_path)
         .map_err(|e| format!("state persistence error: {:?}", e))?;
-    let enclave_args: Vec<&[u8]> = vec![request_bytes.as_ref()];
+    let enclave_args: Vec<&[u8]> = vec![request_bytes.as_ref(), log_level.as_bytes()];
 
     let runner = TmkmsSgxSigner::launch_enclave_app(
         &config.enclave_path,
@@ -200,7 +202,7 @@ pub fn init(
 }
 
 /// startup the enclave with Unix socket pairs for retrieving state updates and persisting them on the host
-pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
+pub fn start(config_path: Option<PathBuf>, log_level: String) -> Result<(), String> {
     let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     if !cp.exists() {
         Err("missing tmkms.toml file".to_owned())
@@ -238,12 +240,13 @@ pub fn start(config_path: Option<PathBuf>) -> Result<(), String> {
             remote,
         )
         .map_err(|e| format!("failed to get enclave request: {:?}", e))?;
+        let enclave_args: Vec<&[u8]> = vec![start_request_bytes.as_ref(), log_level.as_bytes()];
         let runner = TmkmsSgxSigner::launch_enclave_app(
             &config.enclave_path,
             tm_conn,
             state_syncer,
             state_stream,
-            &[&start_request_bytes],
+            &enclave_args,
         )
         .map_err(|e| format!("failed to launch the enclave app: {:?}", e))?;
         runner
@@ -263,6 +266,7 @@ pub fn recover(
     external_cloud_key_path: PathBuf,
     key_backup_data_path: PathBuf,
     recover_consensus_key: bool,
+    log_level: String,
 ) -> Result<(), String> {
     let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
     if !cp.exists() {
@@ -315,12 +319,13 @@ pub fn recover(
         let (state_syncer, _, state_stream) =
             TmkmsSgxSigner::get_state_syncer(&config.state_file_path)
                 .map_err(|e| format!("state persistence error: {:?}", e))?;
+        let enclave_args: Vec<&[u8]> = vec![request_bytes.as_ref(), log_level.as_bytes()];
         let runner = TmkmsSgxSigner::launch_enclave_app(
             &config.enclave_path,
             None,
             state_syncer,
             state_stream,
-            &[request_bytes.as_ref()],
+            &enclave_args,
         )
         .map_err(|e| format!("failed to launch the enclave app: {:?}", e))?;
         debug!("waiting for recover");

@@ -1,10 +1,12 @@
-use tracing::{error, info, warn};
+use tracing::Level;
+use tracing::{error, info, warn, Subscriber};
+use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::{fmt, EnvFilter};
 use vsock::{SockAddr, VsockListener};
 
 use tmkms_nitro_helper::tracing_layer::Layer;
 use tmkms_nitro_helper::VSOCK_HOST_CID;
+use tracing_subscriber::filter::LevelFilter;
 
 mod nitro;
 
@@ -22,17 +24,21 @@ fn main() {
         .flatten()
         .unwrap_or(6050);
 
+    let log_level = env_args
+        .next()
+        .map(|x| {
+            if x.to_lowercase() == "--verbose" || x.to_lowercase() == "-v" {
+                Level::INFO
+            } else {
+                Level::DEBUG
+            }
+        })
+        .unwrap_or_else(|| Level::INFO);
+    let log_layer = LevelFilter::from(log_level);
     let layer = Layer::new(VSOCK_HOST_CID, log_server_port);
     let fmt_layer = fmt::layer().with_target(false);
-
-    // TODO: the log level via a command line arg?
-    let level = "info";
-    let filter_layer = EnvFilter::try_from_default_env()
-        .or_else(|_| EnvFilter::try_new(level))
-        .unwrap();
-
     let layered = tracing_subscriber::registry()
-        .with(filter_layer)
+        .with(log_layer)
         .with(fmt_layer)
         .with(layer);
 
