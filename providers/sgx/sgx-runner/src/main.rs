@@ -3,6 +3,7 @@ mod config;
 mod runner;
 mod shared;
 mod state;
+use crate::config::RecoverConfig;
 use shared::SgxInitRequest;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -49,22 +50,11 @@ enum TmkmsLight {
         v: u32,
     },
     #[structopt(name = "recover", about = "Recover from cloud backup")]
+
     /// Recover from cloud backup payload
     Recover {
-        #[structopt(short)]
-        config_path: Option<PathBuf>,
-        #[structopt(short)]
-        pubkey_display: Option<PubkeyDisplay>,
-        #[structopt(short)]
-        bech32_prefix: Option<String>,
-        #[structopt(short)]
-        wrap_backup_key_path: PathBuf,
-        #[structopt(short)]
-        external_cloud_key_path: PathBuf,
-        #[structopt(short)]
-        key_backup_data_path: PathBuf,
-        #[structopt(short)]
-        recover_consensus_key: bool,
+        #[structopt(flatten)]
+        config: RecoverConfig,
         #[structopt(short, parse(from_occurrences))]
         v: u32,
     },
@@ -129,27 +119,9 @@ fn main() {
             let log_level_str = set_log(v);
             command::start(config_path, log_level_str)
         }
-        TmkmsLight::Recover {
-            config_path,
-            pubkey_display,
-            bech32_prefix,
-            wrap_backup_key_path,
-            external_cloud_key_path,
-            key_backup_data_path,
-            recover_consensus_key,
-            v,
-        } => {
+        TmkmsLight::Recover { config, v } => {
             let log_level_str = set_log(v);
-            command::recover(
-                config_path,
-                pubkey_display,
-                bech32_prefix,
-                wrap_backup_key_path,
-                external_cloud_key_path,
-                key_backup_data_path,
-                recover_consensus_key,
-                log_level_str,
-            )
+            command::recover(config, log_level_str)
         }
     };
     if let Err(e) = result {

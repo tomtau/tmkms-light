@@ -6,9 +6,7 @@ fn main() -> std::io::Result<()> {
     let mut args = std::env::args();
     let command = args.next();
     let log_level = match args.next() {
-        Some(s) if s == "verbose" => {
-            tracing::Level::DEBUG
-        },
+        Some(s) if s == "verbose" => tracing::Level::DEBUG,
         _ => tracing::Level::INFO,
     };
     let subscriber = tracing_subscriber::FmtSubscriber::builder()

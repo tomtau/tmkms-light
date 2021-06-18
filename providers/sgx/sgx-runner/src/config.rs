@@ -3,7 +3,9 @@ use crate::shared::SealedKeyData;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
 use std::{fs::OpenOptions, io, os::unix::fs::OpenOptionsExt, path::Path};
+use structopt::StructOpt;
 use tendermint::{chain, net};
+use tmkms_light::utils::PubkeyDisplay;
 use tracing::error;
 
 /// runner configuration in toml
@@ -71,4 +73,22 @@ pub fn write_backup_file<P: AsRef<Path>>(
     sealed_data: &CloudBackupKeyData,
 ) -> io::Result<()> {
     write_json_file(path, sealed_data)
+}
+
+#[derive(StructOpt, Debug)]
+pub struct RecoverConfig {
+    #[structopt(short)]
+    pub config_path: Option<PathBuf>,
+    #[structopt(short)]
+    pub pubkey_display: Option<PubkeyDisplay>,
+    #[structopt(short)]
+    pub bech32_prefix: Option<String>,
+    #[structopt(short)]
+    pub wrap_backup_key_path: PathBuf,
+    #[structopt(short)]
+    pub external_cloud_key_path: PathBuf,
+    #[structopt(short)]
+    pub key_backup_data_path: PathBuf,
+    #[structopt(short)]
+    pub recover_consensus_key: bool,
 }

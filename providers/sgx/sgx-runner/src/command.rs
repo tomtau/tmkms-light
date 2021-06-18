@@ -1,9 +1,11 @@
-use std::{fs, path::PathBuf};
-
+use crate::config::RecoverConfig;
 use crate::shared::{CloudBackupKey, CloudBackupSeal, SealedKeyData};
 use crate::{config, runner::TmkmsSgxSigner};
 use crate::{shared::get_claim, shared::SgxInitResponse, SgxInitRequest};
+
 use rsa::PublicKeyPemEncoding;
+use std::fs;
+use std::path::PathBuf;
 use tendermint::net;
 use tmkms_light::{
     config::validator::ValidatorConfig,
@@ -258,17 +260,10 @@ pub fn start(config_path: Option<PathBuf>, log_level: String) -> Result<(), Stri
 
 /// recover the previously backed up id/consensus key (e.g. in cloud settings where
 /// physical CPU-affinity isn't guaranteed)
-pub fn recover(
-    config_path: Option<PathBuf>,
-    pubkey_display: Option<PubkeyDisplay>,
-    bech32_prefix: Option<String>,
-    wrap_backup_key_path: PathBuf,
-    external_cloud_key_path: PathBuf,
-    key_backup_data_path: PathBuf,
-    recover_consensus_key: bool,
-    log_level: String,
-) -> Result<(), String> {
-    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
+pub fn recover(recover_config: RecoverConfig, log_level: String) -> Result<(), String> {
+    let cp = recover_config
+        .config_path
+        .unwrap_or_else(|| PathBuf::from("tmkms.toml"));
     if !cp.exists() {
         Err("missing tmkms.toml file".to_owned())
     } else {
@@ -276,25 +271,26 @@ pub fn recover(
             .map_err(|e| format!("toml config file failed to read: {:?}", e))?;
         let config: config::SgxSignOpt = toml::from_str(&toml_string)
             .map_err(|e| format!("toml config file failed to parse: {:?}", e))?;
-        if !recover_consensus_key && config.sealed_id_key_path.is_none() {
+        if !recover_config.recover_consensus_key && config.sealed_id_key_path.is_none() {
             return Err("empty id key path in config".to_owned());
         }
         let cloud_backup = {
-            let sealed_rsa_key: SealedKeyData =
-                serde_json::from_slice(&fs::read(wrap_backup_key_path).map_err(|e| {
+            let sealed_rsa_key: SealedKeyData = serde_json::from_slice(
+                &fs::read(recover_config.wrap_backup_key_path).map_err(|e| {
                     format!(
                         "failed to read sealed wrap key for external backup key: {:?}",
                         e
                     )
-                })?)
-                .map_err(|e| {
-                    format!(
-                        "failed to parse sealed wrap key for external backup key: {:?}",
-                        e
-                    )
-                })?;
+                })?,
+            )
+            .map_err(|e| {
+                format!(
+                    "failed to parse sealed wrap key for external backup key: {:?}",
+                    e
+                )
+            })?;
             let backup_key: CloudBackupSeal = serde_json::from_slice(
-                &fs::read(external_cloud_key_path)
+                &fs::read(recover_config.external_cloud_key_path)
                     .map_err(|e| format!("failed to read external backup key: {:?}", e))?,
             )
             .map_err(|e| format!("failed to parse external backup key: {:?}", e))?;
@@ -305,8 +301,12 @@ pub fn recover(
         };
 
         let key_data = serde_json::from_str(
-            &fs::read_to_string(key_backup_data_path.join("consensus-key.backup"))
-                .map_err(|e| format!("failed to read backup data: {:?}", e))?,
+            &fs::read_to_string(
+                recover_config
+                    .key_backup_data_path
+                    .join("consensus-key.backup"),
+            )
+            .map_err(|e| format!("failed to read backup data: {:?}", e))?,
         )
         .map_err(|e| format!("failed to parse backup data: {:?}", e))?;
         let request = SgxInitRequest::CloudRecover {
@@ -336,14 +336,18 @@ pub fn recover(
             .get_gen_response()
             .ok_or_else(|| "failed to recover key".to_owned())?;
 
-        if recover_consensus_key {
+        if recover_config.recover_consensus_key {
             config::write_sealed_file(config.sealed_consensus_key_path, &sealed_key_data)
                 .map_err(|e| format!("failed to write consensus key: {:?}", e))?;
             let public_key =
                 ed25519_dalek::PublicKey::from_bytes(&sealed_key_data.seal_key_request.keyid)
                     .map_err(|e| format!("ivalid keyid: {:?}", e))?;
             println!("recovered key");
-            print_pubkey(bech32_prefix, pubkey_display, public_key);
+            print_pubkey(
+                recover_config.bech32_prefix,
+                recover_config.pubkey_display,
+                public_key,
+            );
         } else {
             // checked above after config parsing
             let id_path = config.sealed_id_key_path.unwrap();
