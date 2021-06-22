@@ -17,3 +17,13 @@ This project contains portions of code derived from the following libraries:
  * Copyright: Copyright (c) 2019 Tokio Contributors
  * License: MIT License
  * Repository: https://github.com/tokio-rs/tracing
+
+* AWS Nitro Enclaves Python demo
+ * Copyright: Copyright 2020 Richard Fan
+ * License: Apache License 2.0
+ * Repository: https://github.com/richardfan1126/nitro-enclave-python-demo
+
+* bech32
+ * Copyright: Copyright (c) 2017 Pieter Wuille
+ * License: MIT License
+ * Repository: https://github.com/fiatjaf/bech32

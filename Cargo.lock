@@ -881,6 +881,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "half"
+version = "1.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62aca2aba2d62b4a7f5b33f3712cb1b0692779a56fb510499d5c0aa594daeaf3"
+
+[[package]]
 name = "hashbrown"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1350,6 +1356,31 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "memoffset 0.6.4",
+]
+
+[[package]]
+name = "nsm-driver"
+version = "0.1.0"
+source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api?rev=34bad95f97f8c83a844e1db8695e91552b1aa9f3#34bad95f97f8c83a844e1db8695e91552b1aa9f3"
+dependencies = [
+ "libc",
+ "log",
+ "nix 0.15.0",
+ "nsm-io",
+ "serde_cbor",
+]
+
+[[package]]
+name = "nsm-io"
+version = "0.1.0"
+source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api?rev=34bad95f97f8c83a844e1db8695e91552b1aa9f3#34bad95f97f8c83a844e1db8695e91552b1aa9f3"
+dependencies = [
+ "libc",
+ "log",
+ "nix 0.15.0",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
 ]
 
 [[package]]
@@ -1995,6 +2026,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_cbor"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e18acfa2f90e8b735b2836ab8d538de304cbb6729a7360729ea5a895d15a622"
+dependencies = [
+ "half",
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2486,9 +2527,13 @@ dependencies = [
  "aws-ne-sys",
  "ed25519-dalek",
  "nix 0.21.0",
+ "nsm-driver",
+ "nsm-io",
  "rand_core 0.6.3",
+ "serde_bytes",
  "serde_json",
  "subtle",
+ "subtle-encoding",
  "tendermint",
  "tendermint-p2p",
  "tmkms-light",

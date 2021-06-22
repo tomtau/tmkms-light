@@ -1,10 +1,9 @@
 use crate::shared::AwsCredentials;
-use crate::shared::{NitroKeygenConfig, NitroRequest};
+use crate::shared::{NitroKeygenConfig, NitroKeygenResponse, NitroRequest, NitroResponse};
 
 use ed25519_dalek::PublicKey;
 use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
-use tmkms_nitro_helper::NitroResponse;
 use vsock::SockAddr;
 
 // TODO: use aws-rust-sdk after the issue fixed
@@ -99,7 +98,9 @@ pub(crate) mod credential {
     }
 }
 
-/// Generates key and encrypts with AWS KMS at the given path
+/// Generates a keypair and encrypts with AWS KMS at the given path
+/// and returns the public key with attestation doc for it and
+/// the used AWS KMS key id
 pub fn generate_key(
     cid: u32,
     port: u32,
@@ -107,7 +108,7 @@ pub fn generate_key(
     region: &str,
     credentials: AwsCredentials,
     kms_key_id: String,
-) -> Result<PublicKey, String> {
+) -> Result<(PublicKey, Vec<u8>), String> {
     let keygen_request = NitroKeygenConfig {
         credentials,
         kms_key_id,
@@ -132,17 +133,18 @@ pub fn generate_key(
     let response: NitroResponse = serde_json::from_slice(&json_raw)
         .map_err(|e| format!("failed to get keygen response from enclave: {:?}", e))?;
 
-    let (cipher_privkey, pubkey) = match response {
-        NitroResponse::Error(e) => Err(e),
-        NitroResponse::CipherKeypair((cipher, public)) => Ok((cipher, public)),
-    }?;
+    let resp: NitroKeygenResponse = response?;
     OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(true)
         .mode(0o600)
         .open(path.as_ref())
-        .and_then(|mut file| file.write_all(&cipher_privkey))
+        .and_then(|mut file| file.write_all(&resp.encrypted_secret))
         .map_err(|e| format!("couldn't write `{}`: {}", path.as_ref().display(), e))?;
-    PublicKey::from_bytes(&pubkey).map_err(|e| format!("Invalid pubkey key: {:?}", e))
+    Ok((
+        PublicKey::from_bytes(&resp.public_key)
+            .map_err(|e| format!("Invalid pubkey key: {:?}", e))?,
+        resp.attestation_doc,
+    ))
 }
