@@ -48,6 +48,20 @@ Build `tmkms-light-sgx-runner`
 ```bash
 cargo build --target x86_64-unknown-linux-gnu -p tmkms-light-sgx-runner --release
 ```
+##### Reproducible SGX enclave application building
+Build `tmkms-light-sgx-app`
+```bash
+docker build -f Dockerfile.sgx --target export --output type=local,dest=./ .
+```
+
+The output enclave file is `tmkms-light-sgx-app.sgxs`.
+You can then follow [EDP instructions](https://edp.fortanix.com/docs/tasks/deployment/) for SGXS signing.
+
+> :warning: For SGXS signing, the EDP instructions are shown for the "Debug" mode. For the production mode, remove the `--debug` / `-d` flags.
+  
+> :warning: For CPUs without the Flexible Launch Control feature (i.e. SGX v1), the enclave code needs to be signed with the RSA key previously approved by Intel in order to launch in the production mode.
+
+##### Manual SGX enclave application building
 Build `tmkms-light-sgx-app`
 ```bash
 cargo build --target x86_64-fortanix-unknown-sgx -p tmkms-light-sgx-app --release
