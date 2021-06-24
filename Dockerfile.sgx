@@ -1,0 +1,35 @@
+# TODO: use nix + libfaketime etc.
+# (there may still be some non-determinism in the build environment
+# due to `apt-get update` etc.)
+FROM ubuntu:focal-20210609 as build
+ENV DEBIAN_FRONTEND=noninteractive 
+# Install system dependencies / packages.
+RUN apt-get update && apt-get install \
+    curl \
+    pkg-config\
+    libssl-dev \
+    clang-11 \
+    protobuf-compiler -y && ln -s $(which clang-11) /usr/bin/cc
+
+ARG RUST_TOOLCHAIN=nightly-2021-06-23
+# Install Rust (nightly is required for the `x86_64-fortanix-unknown-sgx` target)
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUST_TOOLCHAIN \
+    && /root/.cargo/bin/rustup target add x86_64-fortanix-unknown-sgx --toolchain $RUST_TOOLCHAIN
+ENV PATH="/root/.cargo/bin:$PATH"
+# SGX doesn't support the CPUID instruction, so CPU features are decided at compile-time
+ENV RUSTFLAGS="-Ctarget-feature=+mmx,+sse,+sse2,+sse3,+pclmulqdq,+pclmul,+ssse3,+fma,+sse4.1,+sse4.2,+popcnt,+aes,+avx,+rdrand,+sgx,+bmi1,+avx2,+bmi2,+rdseed,+adx,+sha"
+# actually only `fortanix-sgx-tools` is needed (`sgxs-tools` is optional for development if one wants to use e.g. `sgxs-info` in the container)
+RUN cargo install fortanix-sgx-tools --version 0.4.3 && cargo install sgxs-tools --version 0.8.3
+# right now, there shouldn't be any C dependencies in the enclave app and the Rust compiler should automatically enforce this hardening for `x86_64-fortanix-unknown-sgx`
+# (this is more of a reminder to watch out for this if a C dependency is added to the enclave app in the future)
+ENV CFLAGS="-mlvi-hardening -mllvm -x86-experimental-lvi-inline-asm-hardening"
+WORKDIR /tmkms-light
+USER root
+COPY . .
+RUN cargo build -p tmkms-light-sgx-app --release --target x86_64-fortanix-unknown-sgx \
+    && ftxsgx-elf2sgxs target/x86_64-fortanix-unknown-sgx/release/tmkms-light-sgx-app --heap-size 0x40000 --stack-size 0x40000 --threads 2
+
+FROM scratch AS export
+COPY --from=build /tmkms-light/target/x86_64-fortanix-unknown-sgx/release/tmkms-light-sgx-app.sgxs /tmkms-light-sgx-app.sgxs
+
+# extraction command: `docker build -f Dockerfile.sgx --target export --output type=local,dest=./ .` 
