@@ -165,7 +165,7 @@ impl Response {
             Response::PublicKey(pk) => {
                 let pkr = PubKeyResponse {
                     pub_key: Some(RawPublicKey {
-                        sum: Some(PkSum::Ed25519(pk.to_vec())),
+                        sum: Some(PkSum::Ed25519(pk.to_bytes())),
                     }),
                     error: None,
                 };
