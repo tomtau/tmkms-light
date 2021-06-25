@@ -17,7 +17,7 @@ sha2 = "0.9"
 sgx-isa = { version = "0.3", features = ["sgxstd"] }
 subtle = "2"
 subtle-encoding = "0.5"
-tendermint-p2p = "0.19"
+tendermint-p2p = "0.20"
 tmkms-light-sgx-runner = { path = "../sgx-runner" }
 tmkms-light = { path = "../../.." }
 tracing = "0.1"
