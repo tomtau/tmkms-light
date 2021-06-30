@@ -21,8 +21,12 @@ pub struct LogServer {
 }
 
 impl LogServer {
-    pub fn new(local_port: u32, to_console: bool, log_file: PathBuf) -> std::io::Result<Self> {
-        let file = if log_file.file_name().is_none() {
+    pub fn new(
+        local_port: u32,
+        to_console: bool,
+        log_file: Option<PathBuf>,
+    ) -> std::io::Result<Self> {
+        let file = if let Some(log_file) = log_file {
             let f = OpenOptions::new()
                 .write(true)
                 .append(true)

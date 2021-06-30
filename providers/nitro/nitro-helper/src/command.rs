@@ -1,35 +1,56 @@
-use crate::config::NitroSignOpt;
-use crate::enclave_log_server::LogServer;
-use crate::key_utils::{credential, generate_key};
-use crate::proxy::Proxy;
-use crate::shared::{NitroConfig, NitroRequest};
-use crate::state::StateSyncer;
+pub mod launch_all;
+pub mod nitro_enclave;
+
 use std::{fs, path::PathBuf};
 use sysinfo::{ProcessExt, SystemExt};
 use tendermint::net;
 use tmkms_light::utils::write_u16_payload;
 use tmkms_light::utils::{print_pubkey, PubkeyDisplay};
-use tracing::{debug, Level};
-use tracing_subscriber::FmtSubscriber;
 use vsock::SockAddr;
 
-/// write tmkms.toml + generate keys
+use crate::config::{EnclaveConfig, EnclaveOpt, NitroSignOpt, VSockProxyOpt};
+use crate::key_utils::{credential, generate_key};
+use crate::proxy::Proxy;
+use crate::shared::{NitroConfig, NitroRequest};
+use crate::state::StateSyncer;
+
+/// write tmkms.toml + enclave.toml + generate keys
+/// config_dir: the directory that put the generated config file
 pub fn init(
-    config_path: Option<PathBuf>,
+    config_dir: PathBuf,
     pubkey_display: Option<PubkeyDisplay>,
     bech32_prefix: Option<String>,
     aws_region: String,
     kms_key_id: String,
     cid: Option<u32>,
 ) -> Result<(), String> {
-    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
-    let config = NitroSignOpt {
-        aws_region,
+    if !config_dir.is_dir() || !config_dir.exists() {
+        return Err("config path is not a directory or not exists".to_string());
+    }
+    let cp_helper = config_dir.join("tmkms.toml");
+    let cp_enclave = config_dir.join("enclave.toml");
+
+    let nitro_sign_opt = NitroSignOpt {
+        aws_region: aws_region.clone(),
         ..Default::default()
     };
-    let t = toml::to_string_pretty(&config)
+    let enclave_opt = EnclaveOpt::default();
+    let proxy_opt = VSockProxyOpt {
+        remote_addr: format!("kms.{}.amazonaws.com", aws_region),
+        ..Default::default()
+    };
+    let enclave_config = EnclaveConfig {
+        enclave: enclave_opt,
+        vsock_proxy: proxy_opt,
+    };
+    let t = toml::to_string_pretty(&nitro_sign_opt)
         .map_err(|e| format!("failed to create a config in toml: {:?}", e))?;
-    fs::write(cp, t).map_err(|e| format!("failed to write a config: {:?}", e))?;
+    let t_enclave_config = toml::to_string(&enclave_config)
+        .map_err(|e| format!("failed to create a config in toml: {:?}", e))?;
+    fs::write(cp_helper, t).map_err(|e| format!("failed to write a config: {:?}", e))?;
+    fs::write(cp_enclave, t_enclave_config)
+        .map_err(|e| format!("failed to write a launch all config: {:?}", e))?;
+    let config = nitro_sign_opt;
     let (cid, port) = if let Some(cid) = cid {
         (cid, config.enclave_config_port)
     } else {
@@ -77,117 +98,93 @@ pub fn init(
             credentials,
             kms_key_id,
         )
-        .map_err(|e| format!("failed to generate a key: {:?}", e))?;
+        .map_err(|e| format!("failed to generate a sealed id key: {:?}", e))?;
     }
     Ok(())
 }
 
+pub fn check_vsock_proxy() -> bool {
+    let mut system = sysinfo::System::new_all();
+    system.refresh_all();
+    system.get_processes().iter().any(|(_pid, p)| {
+        let cmd = p.cmd();
+        cmd.contains(&"vsock-proxy".to_string())
+    })
+}
+
 /// push config to enclave, start up a proxy (if needed) + state syncer
-pub fn start(
-    config_path: Option<PathBuf>,
-    cid: Option<u32>,
-    log_level: Level,
-) -> Result<(), String> {
-    let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
-    if !cp.exists() {
-        Err("missing tmkms.toml file".to_owned())
+pub fn start(config: &NitroSignOpt, cid: Option<u32>) -> Result<(), String> {
+    tracing::debug!("start helper with config: {:?}, cid: {:?}", config, cid);
+    let credentials = if let Some(credentials) = &config.credentials {
+        credentials.clone()
     } else {
-        let mut system = sysinfo::System::new_all();
-        system.refresh_all();
-        if !system
-            .get_processes()
-            .iter()
-            .any(|(_pid, p)| p.name() == "vsock-proxy")
-        {
-            return Err("vsock-proxy not running".to_owned());
-        }
-
-        let subscriber = FmtSubscriber::builder().with_max_level(log_level).finish();
-
-        tracing::subscriber::set_global_default(subscriber)
-            .map_err(|e| format!("setting default subscriber failed: {:?}", e))?;
-        let toml_string = fs::read_to_string(cp)
-            .map_err(|e| format!("toml config file failed to read: {:?}", e))?;
-        let config: NitroSignOpt = toml::from_str(&toml_string)
-            .map_err(|e| format!("toml config file failed to parse: {:?}", e))?;
-        let credentials = if let Some(credentials) = config.credentials {
-            credentials
-        } else {
-            credential::get_credentials()?
-        };
-        let peer_id = match &config.address {
-            net::Address::Tcp { peer_id, .. } => *peer_id,
-            _ => None,
-        };
-        let state_syncer = StateSyncer::new(config.state_file_path, config.enclave_state_port)
-            .map_err(|e| format!("failed to get a state syncing helper: {:?}", e))?;
-        let sealed_consensus_key = fs::read(config.sealed_consensus_key_path)
-            .map_err(|e| format!("failed to read a sealed consensus key: {:?}", e))?;
-        let sealed_id_key = if let Some(p) = config.sealed_id_key_path {
-            if let net::Address::Tcp { .. } = config.address {
-                Some(
-                    fs::read(p)
-                        .map_err(|e| format!("failed to read a sealed identity key: {:?}", e))?,
-                )
-            } else {
-                None
-            }
+        credential::get_credentials()?
+    };
+    let peer_id = match config.address {
+        net::Address::Tcp { peer_id, .. } => peer_id,
+        _ => None,
+    };
+    let state_syncer = StateSyncer::new(config.state_file_path.clone(), config.enclave_state_port)
+        .map_err(|e| format!("failed to get a state syncing helper: {:?}", e))?;
+    let sealed_consensus_key = fs::read(config.sealed_consensus_key_path.clone())
+        .map_err(|e| format!("failed to read a sealed consensus key: {:?}", e))?;
+    let sealed_id_key = if let Some(p) = &config.sealed_id_key_path {
+        if let net::Address::Tcp { .. } = config.address {
+            Some(
+                fs::read(p)
+                    .map_err(|e| format!("failed to read a sealed identity key: {:?}", e))?,
+            )
         } else {
             None
-        };
-        let enclave_config = NitroConfig {
-            chain_id: config.chain_id.clone(),
-            max_height: config.max_height,
-            sealed_consensus_key,
-            sealed_id_key,
-            peer_id,
-            enclave_state_port: config.enclave_state_port,
-            enclave_tendermint_conn: config.enclave_tendermint_conn,
-            credentials,
-            aws_region: config.aws_region,
-        };
-        let addr = if let Some(cid) = cid {
-            SockAddr::new_vsock(cid, config.enclave_config_port)
-        } else {
-            SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port)
-        };
-        let mut socket = vsock::VsockStream::connect(&addr).map_err(|e| {
-            format!(
-                "failed to connect to the enclave to push its config: {:?}",
-                e
-            )
-        })?;
-        let request = NitroRequest::Start(enclave_config);
-        let config_raw = serde_json::to_vec(&request)
-            .map_err(|e| format!("failed to serialize the config: {:?}", e))?;
-        write_u16_payload(&mut socket, &config_raw)
-            .map_err(|e| format!("failed to write the config: {:?}", e))?;
-        let proxy = match &config.address {
-            net::Address::Unix { path } => {
-                debug!(
-                    "{}: Creating a proxy {}...",
-                    &config.chain_id, &config.address
-                );
-
-                Some(Proxy::new(config.enclave_tendermint_conn, path.clone()))
-            }
-            _ => None,
-        };
-        if let Some(p) = proxy {
-            p.launch_proxy();
         }
-
-        let enclave_log_server = LogServer::new(
-            config.enclave_log_port,
-            config.enclave_log_to_console,
-            config.enclave_log_file.clone(),
+    } else {
+        None
+    };
+    let enclave_config = NitroConfig {
+        chain_id: config.chain_id.clone(),
+        max_height: config.max_height,
+        sealed_consensus_key,
+        sealed_id_key,
+        peer_id,
+        enclave_state_port: config.enclave_state_port,
+        enclave_tendermint_conn: config.enclave_tendermint_conn,
+        credentials,
+        aws_region: config.aws_region.clone(),
+    };
+    let addr = if let Some(cid) = cid {
+        SockAddr::new_vsock(cid, config.enclave_config_port)
+    } else {
+        SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port)
+    };
+    let mut socket = vsock::VsockStream::connect(&addr).map_err(|e| {
+        format!(
+            "failed to connect to the enclave to push its config: {:?}",
+            e
         )
-        .map_err(|e| format!("{:?}", e))?;
+    })?;
+    let request = NitroRequest::Start(enclave_config);
+    let config_raw = serde_json::to_vec(&request)
+        .map_err(|e| format!("failed to serialize the config: {:?}", e))?;
+    write_u16_payload(&mut socket, &config_raw)
+        .map_err(|e| format!("failed to write the config: {:?}", e))?;
+    let proxy = match &config.address {
+        net::Address::Unix { path } => {
+            tracing::debug!(
+                "{}: Creating a proxy {}...",
+                &config.chain_id,
+                &config.address
+            );
 
-        enclave_log_server.launch();
-        // state syncing runs in an infinite loop (so does the proxy)
-        // TODO: check if signal capture + a graceful shutdown would help with anything (given state writing is via "tempfile")
-        state_syncer.launch_syncer().join().expect("state syncing");
-        Ok(())
+            Some(Proxy::new(config.enclave_tendermint_conn, path.clone()))
+        }
+        _ => None,
+    };
+    if let Some(p) = proxy {
+        p.launch_proxy();
     }
+
+    // state syncing runs in an infinite loop (so does the proxy)
+    // TODO: check if signal capture + a graceful shutdown would help with anything (given state writing is via "tempfile")
+    state_syncer.launch_syncer().join().expect("state syncing");
+    Ok(())
 }

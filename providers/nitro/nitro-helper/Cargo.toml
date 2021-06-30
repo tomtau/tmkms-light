@@ -11,6 +11,7 @@ main = ["sysinfo", "reqwest"]
 [dependencies]
 anomaly = "0.2"
 bytes = "= 0.5"
+ctrlc = "3"
 chrono = "0.4"
 ed25519 = { version = "1", features = [ "serde" ] }
 ed25519-dalek = "1"
