@@ -116,8 +116,120 @@ There are two crates that need to be compiled separately:
 * `tmkms-nitro-enclave`: this is the enclave application that needs to be compiled for the `x86_64-unknown-linux-musl` target if you are using the Alpine Linux (or equivalent) for the Docker file that gets converted to the enclave image file. The enclave application also needs to be linked against AWS Nitro Enclaves SDK etc., so make sure these libraries are present in your build environment -- see this [AWS Dockerfile](https://github.com/aws/aws-nitro-enclaves-acm/blob/main/env/enclave/Dockerfile).
 * `tmkms-nitro-helper`: this is the application on the host that pushes the configuration to the enclave and provides extra vsock proxy connections to interface with the host system.
 #### Installation
-TODO: instructions from the early prototype are here: https://chain.crypto.com/docs/getting-started/advanced-tmkms-integration.html#setting-up-aws-nitro-enclaves-tendermint-kms-for-signing-blocks
+#### 1. Set up AWS nitro enclaves
+Follow the step 1 and step 4 [here](https://chain.crypto.com/docs/getting-started/advanced-tmkms-integration.html#setting-up-aws-nitro-enclaves-tendermint-kms-for-signing-blocks)
+
+##### 2. build tmkms-nitro-enclave and tmkms-nitro-helper
+
+###### 2.1. build docker image in which build the tmkms-nitro-enclave
+```shell
+$ cd tmkms-light
+$ docker build -t aws-ne-build \
+       --build-arg USER=$(whoami) \
+       --build-arg USER_ID=$(id -u) \
+       --build-arg GROUP_ID=$(id -g) \
+       --build-arg RUST_TOOLCHAIN="1.46.0" \
+       --build-arg CTR_HOME="$CTR_HOME" \
+       -f Dockerfile.nitro .
+```
+
+#####2.2. build tmkms-nitro-helper
+```shell
+$ cd tmkms-light
+$ cargo build --target x86_64-unknown-linux-gnu -p tmkms-nitro-helper --release
+```
+After build process finished, move the binary `tmkms-nitro-helper` to one of your `PATH` directories.
+
+#####2.3. create eli file
+
+Use the docker image `aws-ne-build` which built in step 2.1 or just pull the docker image from dockerhub by using `docker pull cryptocom/nitro-enclave-tmkms:latest`
+```shell
+$ mkdir ~/.tmkms
+$ nitro-cli build-enclave \
+  --docker-uri aws-ne-build \
+  --output-file ~/.tmkms/tmkms.eif
+```
+
 #### Configuration
-TODO
+First, you need to start nitro enclave and generate the encrypted validator key and config files:
+
+```shell
+$ tmkms-nitro-helper enclave run --cpu-count 2
+```
+
+In another shell, you can check the enclave status:
+
+```shell
+$ tmkms-nitro-helper enclave info
+```
+the output should be:
+```json
+[
+  {
+    "EnclaveID": "i-xxx-xxx",
+    "ProcessID": 31388,
+    "EnclaveCID": 1,
+    "NumberOfCPUs": 2,
+    "CPUIDs": [
+      1,
+      3
+    ],
+    "MemoryMiB": 512,
+    "State": "RUNNING",
+    "Flags": "NONE"
+  }
+]
+```
+
+create the encrypted validator key and config files:
+
+```shell
+$ mkdir ~/.tmkms && cd ~/.tmkms
+$ tmkms-nitro-helper init \
+    -a $KMS_REGIN \
+    -k $KMS_KEY_ID \
+    -p bech32 \
+    -b crocnclconspub \
+    --cid $EnclaveCID
+```
+where:
+* `KMS_REGIN`: where your AWS ec2 located like `ap-southeast-1`, see more [here](https://docs.aws.amazon.com/general/latest/gr/rande.html)
+* `KMS_KEY_ID`: [AWS Key Management Service](https://aws.amazon.com/kms/?nc1=h_ls) key id
+* `EnclaveCID`: can get from command `tmkms-nitro-helper enclave info`
+
+It should encrypted validator signing key `secrets/secret.key`, tmkms config file `tmkms.toml` and enclave config file `enclave.toml`, the output looks like:
+
+```json
+public key: crocnclconspub1zcjduep..........tq48jchd
+Nitro Enclave attestation:
+hEShATgioFkRZKlpb.......................3L2Z28yKrDMTR
+```
+
 #### Running
-TODO
+##### Running step by step
+You need to start three components to make it work:
+1. start nitro enclave:
+```shell
+$ tmkms-nitro-helper enclave run --cpu-count 2 -v
+```
+2. start vsock proxy:
+```shell
+$ tmkms-nitro-helper enclave vsock-proxy --remote-addr kms.ap-southeast-1.amazonaws.com
+```
+do remember to change the value of `remote-addr` associated with your AWS region.
+
+3. start tmkms helper:
+
+```shell
+$ tmkms-nitro-helper start -c ./tmkms.toml -v
+```
+
+You can use `-h` or `--help` to see more options to start the three components
+
+##### Running all in one
+There is a handy command to start all the three components all in one:
+
+```shell
+$ cd ~/.tmkms
+$ tmkms-nitro-helper launch-all -v
+```
