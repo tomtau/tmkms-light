@@ -150,7 +150,12 @@ fn run() -> Result<(), String> {
             if !check_vsock_proxy() {
                 return Err("vsock proxy not started".to_string());
             }
-            start(&config, cid)?;
+            let (sender, receiver) = channel();
+            ctrlc::set_handler(move || {
+                let _ = sender.send(());
+            })
+            .map_err(|_| "Error to set Ctrl-C channel".to_string())?;
+            start(&config, cid, receiver)?;
         }
         TmkmsLight::Enclave(CommandEnclave::Info) => {
             let info = describe_enclave()?;

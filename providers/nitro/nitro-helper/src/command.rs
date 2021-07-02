@@ -1,6 +1,7 @@
 pub mod launch_all;
 pub mod nitro_enclave;
 
+use std::sync::mpsc::Receiver;
 use std::{fs, path::PathBuf};
 use sysinfo::{ProcessExt, SystemExt};
 use tendermint::net;
@@ -113,7 +114,12 @@ pub fn check_vsock_proxy() -> bool {
 }
 
 /// push config to enclave, start up a proxy (if needed) + state syncer
-pub fn start(config: &NitroSignOpt, cid: Option<u32>) -> Result<(), String> {
+/// stop_sync_rx: when get data from it, the sync thread will be finished
+pub fn start(
+    config: &NitroSignOpt,
+    cid: Option<u32>,
+    stop_sync_rx: Receiver<()>,
+) -> Result<(), String> {
     tracing::debug!("start helper with config: {:?}, cid: {:?}", config, cid);
     let credentials = if let Some(credentials) = &config.credentials {
         credentials.clone()
@@ -184,7 +190,9 @@ pub fn start(config: &NitroSignOpt, cid: Option<u32>) -> Result<(), String> {
     }
 
     // state syncing runs in an infinite loop (so does the proxy)
-    // TODO: check if signal capture + a graceful shutdown would help with anything (given state writing is via "tempfile")
-    state_syncer.launch_syncer().join().expect("state syncing");
+    state_syncer
+        .launch_syncer(stop_sync_rx)
+        .join()
+        .map_err(|_| "join thread error".to_string())?;
     Ok(())
 }

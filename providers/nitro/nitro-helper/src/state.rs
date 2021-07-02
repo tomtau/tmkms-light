@@ -1,6 +1,7 @@
 use crate::shared::VSOCK_HOST_CID;
 use anomaly::{fail, format_err};
 use std::os::unix::io::AsRawFd;
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::thread;
 use std::{
     fs,
@@ -108,8 +109,8 @@ impl StateSyncer {
         })
     }
 
-    /// Launches the state syncer
-    pub fn launch_syncer(mut self) -> thread::JoinHandle<()> {
+    /// Launches the state syncer, when get data from stop_recv, the thread will be finished
+    pub fn launch_syncer(mut self, stop_recv: Receiver<()>) -> thread::JoinHandle<()> {
         thread::spawn(move || {
             info!("listening for enclave persistence");
             for conn in self.vsock_listener.incoming() {
@@ -130,6 +131,13 @@ impl StateSyncer {
                                         Self::persist_state(&self.state_file_path, &self.state)
                                     {
                                         warn!("state persistence failed: {}", e);
+                                    }
+                                    match stop_recv.try_recv() {
+                                        Ok(()) | Err(TryRecvError::Disconnected) => {
+                                            warn!("stop state persistence");
+                                            return;
+                                        }
+                                        Err(TryRecvError::Empty) => continue,
                                     }
                                 }
                             }
