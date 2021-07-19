@@ -107,7 +107,7 @@ pub fn init(
 pub fn check_vsock_proxy() -> bool {
     let mut system = sysinfo::System::new_all();
     system.refresh_all();
-    system.get_processes().iter().any(|(_pid, p)| {
+    system.processes().iter().any(|(_pid, p)| {
         let cmd = p.cmd();
         cmd.contains(&"vsock-proxy".to_string())
     })
