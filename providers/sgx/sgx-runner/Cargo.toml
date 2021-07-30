@@ -12,7 +12,7 @@ ed25519-dalek = "1"
 rsa = { version = "0.4", features = ["serde"] }
 sgx-isa = { version = "0.3", features = ["serde"] }
 thiserror = "1"
-tendermint = { version = "0.20" }
+tendermint = { version = "0.21" }
 tmkms-light = { path = "../../.." }
 zeroize = "1"
 
