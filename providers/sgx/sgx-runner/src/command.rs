@@ -3,7 +3,7 @@ use crate::shared::{CloudBackupKey, CloudBackupSeal, SealedKeyData};
 use crate::{config, runner::TmkmsSgxSigner};
 use crate::{shared::get_claim, shared::SgxInitResponse, SgxInitRequest};
 
-use rsa::PublicKeyPemEncoding;
+use rsa::pkcs1::ToRsaPublicKey;
 use std::fs;
 use std::path::PathBuf;
 use tendermint::net;
@@ -75,7 +75,7 @@ pub fn keywrap(
                 );
             } else {
                 let pkcs1 = wrap_pub_key
-                    .to_pem_pkcs1()
+                    .to_pkcs1_pem()
                     .map_err(|e| format!("pubkey err: {:?}", e))?;
                 println!("wrap public key in PKCS1:\n{}\n", pkcs1);
             }

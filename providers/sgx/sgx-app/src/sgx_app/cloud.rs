@@ -11,7 +11,8 @@ use aes_gcm_siv::{
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::{PaddingScheme, PrivateKeyEncoding, RSAPrivateKey, RSAPublicKey};
+use rsa::pkcs1::{FromRsaPrivateKey, ToRsaPrivateKey};
+use rsa::{PaddingScheme, RsaPrivateKey, RsaPublicKey};
 use sgx_isa::ErrorCode;
 use sgx_isa::{Report, Targetinfo};
 use sha2::{Digest, Sha256};
@@ -41,12 +42,12 @@ pub enum CloudError {
 pub fn generate_keypair(
     csprng: &mut OsRng,
     targetinfo: Targetinfo,
-) -> Result<(RSAPublicKey, SealedKeyData, Report), CloudError> {
+) -> Result<(RsaPublicKey, SealedKeyData, Report), CloudError> {
     const BITS: usize = 2048;
     // default exponent 65537
     let mut priv_key =
-        RSAPrivateKey::new(csprng, BITS).map_err(|_| CloudError::SecretGenerationError)?;
-    let pub_key = RSAPublicKey::from(&priv_key);
+        RsaPrivateKey::new(csprng, BITS).map_err(|_| CloudError::SecretGenerationError)?;
+    let pub_key = RsaPublicKey::from(&priv_key);
 
     let claim_payload = get_claim(&pub_key);
     let mut hasher = Sha256::new();
@@ -55,18 +56,12 @@ pub fn generate_keypair(
     let mut report_data = [0u8; 64];
     report_data[0..32].copy_from_slice(&result);
     let report = Report::for_target(&targetinfo, &report_data);
-    let pkcs1 = priv_key.to_pkcs1();
+    let pkcs1 = priv_key.to_pkcs1_der();
     priv_key.zeroize();
-    if let Ok(mut secret) = pkcs1 {
-        match crate::sgx_app::keypair_seal::seal_secret(csprng, &secret, result.into()) {
-            Ok(sealed_secret) => {
-                secret.zeroize();
-                Ok((pub_key, sealed_secret, report))
-            }
-            Err(e) => {
-                secret.zeroize();
-                Err(CloudError::SealingError(e))
-            }
+    if let Ok(secret) = pkcs1 {
+        match crate::sgx_app::keypair_seal::seal_secret(csprng, secret.as_der(), result.into()) {
+            Ok(sealed_secret) => Ok((pub_key, sealed_secret, report)),
+            Err(e) => Err(CloudError::SealingError(e)),
         }
     } else {
         Err(CloudError::SecretGenerationError)
@@ -75,7 +70,7 @@ pub fn generate_keypair(
 
 /// helper to decrypt the backup key
 fn decrypt_wrapped_key(
-    priv_key: &RSAPrivateKey,
+    priv_key: &RsaPrivateKey,
     backup_data_seal: CloudBackupSeal,
 ) -> Result<GenericArray<u8, U32>, CloudError> {
     let mut wrapping_key = priv_key
@@ -104,7 +99,7 @@ pub fn cloud_backup(
 ) -> Result<CloudBackupKeyData, CloudError> {
     let mut priv_key_raw = crate::sgx_app::keypair_seal::unseal_secret(&backup.sealed_rsa_key)
         .map_err(CloudError::SealingError)?;
-    let mpriv_key = RSAPrivateKey::from_pkcs1(&priv_key_raw);
+    let mpriv_key = RsaPrivateKey::from_pkcs1_der(&priv_key_raw);
     priv_key_raw.zeroize();
     let mut priv_key = mpriv_key.map_err(|_| CloudError::SecretGenerationError)?;
     let mbackup_key = decrypt_wrapped_key(&priv_key, backup.backup_key);
@@ -139,7 +134,7 @@ pub fn reseal_recover_cloud(
 ) -> Result<SealedKeyData, CloudError> {
     let mut priv_key_raw = crate::sgx_app::keypair_seal::unseal_secret(&backup.sealed_rsa_key)
         .map_err(CloudError::SealingError)?;
-    let mpriv_key = RSAPrivateKey::from_pkcs1(&priv_key_raw);
+    let mpriv_key = RsaPrivateKey::from_pkcs1_der(&priv_key_raw);
     priv_key_raw.zeroize();
     let mut priv_key = mpriv_key.map_err(|_| CloudError::SecretGenerationError)?;
     let mbackup_key = decrypt_wrapped_key(&priv_key, backup.backup_key);
@@ -185,7 +180,7 @@ pub mod tests {
     use rsa::PublicKey;
     use rsa::PublicKeyParts;
 
-    pub fn get_wrapped_key(csprng: &mut OsRng, rsa_pub: RSAPublicKey) -> CloudBackupSeal {
+    pub fn get_wrapped_key(csprng: &mut OsRng, rsa_pub: RsaPublicKey) -> CloudBackupSeal {
         let mut wrap_key1 = [0u8; 32];
         csprng.fill_bytes(&mut wrap_key1);
 
@@ -236,7 +231,7 @@ pub mod tests {
         let eb = base64::decode_config(&eb64, base64::URL_SAFE).unwrap();
         let n = BigUint::from_bytes_be(&nb);
         let e = BigUint::from_bytes_be(&eb);
-        let pubkey = RSAPublicKey::new(n, e).unwrap();
+        let pubkey = RsaPublicKey::new(n, e).unwrap();
         let n = pubkey.n().to_bytes_be();
         let e = pubkey.e().to_bytes_be();
         let encoded_n = base64::encode_config(&n, base64::URL_SAFE);
@@ -300,7 +295,7 @@ BTDF9yEwtrEQ1/xuPQMv8x6cnZFYH0ljjbXcTh6VJNv03MSC30pAQCrLSLl3nvHk
                 data
             });
         let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
-        let secret = RSAPrivateKey::from_pkcs1(&der_bytes).expect("failed to parse key");
+        let secret = RsaPrivateKey::from_pkcs1_der(&der_bytes).expect("failed to parse key");
 
         let encrypted_key = "nsohDxPYH9/iyLQvMujkFiTUJr5IiYfNrnYo0hoqoo0rFlUYw995X2REbsogKYcfqWQz7Rld6zEqLfBnD2ess+6pN6O+e1HXxmp6mNXxSAMl2rKGf08Ahl3XbQw0vQ7TNOGGdTlQoli2zbIKE/OsUl5DMqpjSyjDxNDJsKDis65tlnf39k1iMqjYLZMzUZEKTv5Sv16sKhk6TKyvaScNOOd+ctzVay8YFCh0cV9TT4rF/pq64RmX/T8VUTRAgUq/kAt7ZJYw/f2kILMBbBvugc00dq0WxQ+QRC6vDLhxZTxkLDBLHxLxeLlYpVbMMe83uxLcfCoXNOg5og3XeNRMpBNs/asA+eScIlW50xPbpzel9l0AZ9PEu2LAjBjcTAikGdigjKMuDEc=";
         let enckey_payload = base64::decode(&encrypted_key).expect("decode enc key");

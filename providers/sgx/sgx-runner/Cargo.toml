@@ -9,7 +9,7 @@ base64 = "0.13"
 serde = { version = "1", features = ["derive"] }
 ed25519 = { version = "1", features = ["serde"] }
 ed25519-dalek = "1"
-rsa = { version = "0.4", features = ["serde"] }
+rsa = { version = "0.5", features = ["serde", "alloc"] }
 sgx-isa = { version = "0.3", features = ["serde"] }
 thiserror = "1"
 tendermint = { version = "0.21" }

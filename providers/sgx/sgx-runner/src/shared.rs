@@ -224,7 +224,7 @@ pub enum SgxInitResponse {
         /// key sealed for local CPU
         wrap_key_sealed: SealedKeyData,
         /// wrapping public key
-        wrap_pub_key: rsa::RSAPublicKey,
+        wrap_pub_key: rsa::RsaPublicKey,
         /// report attesting the wrapping public key
         /// (to be used for a quote)
         pub_key_report: Report,
@@ -240,7 +240,7 @@ pub enum SgxInitResponse {
 
 /// obtain a json claim for RSA pubkey
 /// (bigendian values  are encoded in URL-safe base64)
-pub fn get_claim(wrap_pub_key: &rsa::RSAPublicKey) -> String {
+pub fn get_claim(wrap_pub_key: &rsa::RsaPublicKey) -> String {
     let n = wrap_pub_key.n().to_bytes_be();
     let e = wrap_pub_key.e().to_bytes_be();
     let encoded_n = base64::encode_config(&n, base64::URL_SAFE);
