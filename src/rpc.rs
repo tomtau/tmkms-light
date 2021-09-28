@@ -109,7 +109,7 @@ impl Response {
     /// signed vote
     pub fn vote_response(vote: SignVoteRequest, signature: ed25519_dalek::Signature) -> Self {
         let mut vote = vote.vote;
-        vote.signature = signature.into();
+        vote.signature = Some(signature.into());
         Response::SignedVote(SignedVoteResponse {
             vote: Some(vote),
             error: None,
@@ -122,7 +122,7 @@ impl Response {
         signature: ed25519_dalek::Signature,
     ) -> Self {
         let mut proposal = proposal.proposal;
-        proposal.signature = signature.into();
+        proposal.signature = Some(signature.into());
         Response::SignedProposal(SignedProposalResponse {
             proposal: Some(proposal),
             error: None,
