@@ -687,6 +687,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "flex-error"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e8de6bf49fb8856ee814e288a518e0d45598b6f78a95c1233b96eedba8bc06a"
+dependencies = [
+ "eyre",
+ "paste",
+]
+
+[[package]]
 name = "flume"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1593,6 +1603,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
+
+[[package]]
 name = "pem-rfc7468"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2412,16 +2428,16 @@ dependencies = [
 
 [[package]]
 name = "tendermint"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0752808f59b612916614e92e43be64e9ba566b762a266bcfcf7dce1b324e9319"
+checksum = "fa5354dfcc3bbd8bf3b000b9cfb19afcb4e1bbaed9d6b2d6bc2fa05e027bd7e1"
 dependencies = [
- "anomaly",
  "async-trait",
  "bytes 1.0.1",
  "chrono",
  "ed25519",
  "ed25519-dalek",
+ "flex-error",
  "futures 0.3.16",
  "num-traits",
  "once_cell",
@@ -2436,7 +2452,7 @@ dependencies = [
  "subtle",
  "subtle-encoding",
  "tendermint-proto",
- "thiserror",
+ "time",
  "toml",
  "url",
  "zeroize",
@@ -2444,36 +2460,39 @@ dependencies = [
 
 [[package]]
 name = "tendermint-p2p"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17f4ca60f48da1a7a942f99ac09fbfb9b0a0484eedbf597d8781aa7fffd3bca2"
+checksum = "2556ced9c4daabb5825ece78dd314c9a0d58c86bf91a72160ef6536630a1bb6f"
 dependencies = [
+ "aead",
  "chacha20poly1305",
  "ed25519-dalek",
  "eyre",
+ "flex-error",
  "flume",
  "hkdf",
  "merlin",
  "prost",
  "rand_core 0.5.1",
  "sha2",
+ "signature",
  "subtle",
  "tendermint",
  "tendermint-proto",
- "thiserror",
+ "tendermint-std-ext",
  "x25519-dalek",
  "zeroize",
 ]
 
 [[package]]
 name = "tendermint-proto"
-version = "0.21.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfd0371c6b0c7fc4f6b053b8a1bc868a2a47c49a1408c4cd6f595d9f3bd3c238"
+checksum = "4c36f58bd68be7a6e3221c49cc1a14cbc619c189bb26a43425f544831922d2be"
 dependencies = [
- "anomaly",
  "bytes 1.0.1",
  "chrono",
+ "flex-error",
  "num-derive 0.3.3",
  "num-traits",
  "prost",
@@ -2481,8 +2500,13 @@ dependencies = [
  "serde",
  "serde_bytes",
  "subtle-encoding",
- "thiserror",
 ]
+
+[[package]]
+name = "tendermint-std-ext"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21dba479415a6ad8892982a375fbc98f1939122460e8a6f07f0db4ec303965d0"
 
 [[package]]
 name = "textwrap"
