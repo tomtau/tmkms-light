@@ -60,8 +60,9 @@ jobs:
           --ignore RUSTSEC-2020-0036
           --ignore RUSTSEC-2020-0016
           --ignore RUSTSEC-2019-0036
-          --ignore RUSTSEC-2021-0064
+          --ignore RUSTSEC-2021-0114
           --ignore RUSTSEC-2021-0073
+          --ignore RUSTSEC-2021-0119
   
   build:
     runs-on: ubuntu-latest
@@ -126,7 +127,7 @@ jobs:
           push: false
           file: Dockerfile.nitro
           build-args: |
-            RUST_TOOLCHAIN=1.50.0
+            RUST_TOOLCHAIN=1.55.0
   run-integration-tests:
     runs-on: ubuntu-latest
     needs: build
