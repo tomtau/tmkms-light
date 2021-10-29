@@ -25,8 +25,8 @@ structopt = "0.3"
 subtle-encoding = { version = "0.5", features = [ "bech32-preview" ] }
 sysinfo = { version = "0.20", optional = true }
 tempfile = "3"
-tendermint = { version = "0.23" }
-tendermint-config = { version = "0.23" }
+tendermint = "0.23"
+tendermint-config = "0.23"
 thiserror = "1"
 tmkms-light = { path = "../../.." }
 tokio = { version = "1", features = [ "rt" ] }
