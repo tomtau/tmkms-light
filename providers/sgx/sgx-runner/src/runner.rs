@@ -13,7 +13,7 @@ use std::thread;
 use std::{fs, path::PathBuf};
 use std::{future::Future, io, pin::Pin};
 use tendermint::consensus;
-use tendermint::net;
+use tendermint_config::net;
 use tmkms_light::config::validator::ValidatorConfig;
 use tmkms_light::error::{Error, ErrorKind};
 use tmkms_light::utils::read_u16_payload;

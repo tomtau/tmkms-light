@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install \
     clang-11 \
     protobuf-compiler -y && ln -s $(which clang-11) /usr/bin/cc
 
-ARG RUST_TOOLCHAIN=nightly-2021-06-23
+ARG RUST_TOOLCHAIN=nightly-2021-10-28
 # Install Rust (nightly is required for the `x86_64-fortanix-unknown-sgx` target)
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUST_TOOLCHAIN \
     && /root/.cargo/bin/rustup target add x86_64-fortanix-unknown-sgx --toolchain $RUST_TOOLCHAIN

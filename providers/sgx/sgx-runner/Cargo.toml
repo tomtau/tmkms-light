@@ -1,18 +1,19 @@
 [package]
 name = "tmkms-light-sgx-runner"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>", "Linfeng Yuan <linfeng@crypto.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 base64 = "0.13"
 serde = { version = "1", features = ["derive"] }
 ed25519 = { version = "1", features = ["serde"] }
-ed25519-dalek = "1"
+ed25519-dalek =  { version = "1", features = ["serde"] }
 rsa = { version = "0.5", features = ["serde", "alloc"] }
 sgx-isa = { version = "0.3", features = ["serde"] }
 thiserror = "1"
-tendermint = { version = "0.22" }
+tendermint = "0.23"
+tendermint-config = "0.23"
 tmkms-light = { path = "../../.." }
 zeroize = "1"
 
