@@ -192,7 +192,9 @@ impl FromStr for CloudBackupSeal {
 }
 
 /// request sent to the enclave app
+/// TODO: check the clippy size diff warning (it may not be worth it, given these are one-off requests)
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum SgxInitRequest {
     /// generates a wrapping key for cloud backups
     GenWrapKey {
@@ -218,7 +220,9 @@ pub enum SgxInitRequest {
 }
 
 /// response sent from the enclave app
+/// TODO: check the clippy size diff warning (it may not be worth it, given these are one-off requests)
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum SgxInitResponse {
     WrapKey {
         /// key sealed for local CPU

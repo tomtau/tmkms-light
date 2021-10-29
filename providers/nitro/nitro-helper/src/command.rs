@@ -4,7 +4,7 @@ pub mod nitro_enclave;
 use std::sync::mpsc::Receiver;
 use std::{fs, path::PathBuf};
 use sysinfo::{ProcessExt, SystemExt};
-use tendermint::net;
+use tendermint_config::net;
 use tmkms_light::utils::write_u16_payload;
 use tmkms_light::utils::{print_pubkey, PubkeyDisplay};
 use vsock::SockAddr;
@@ -181,7 +181,10 @@ pub fn start(
                 &config.address
             );
 
-            Some(Proxy::new(config.enclave_tendermint_conn, path.clone()))
+            Some(Proxy::new(
+                config.enclave_tendermint_conn,
+                PathBuf::from(path),
+            ))
         }
         _ => None,
     };

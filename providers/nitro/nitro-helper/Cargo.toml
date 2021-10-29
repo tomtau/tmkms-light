@@ -1,8 +1,8 @@
 [package]
 name = "tmkms-nitro-helper"
-version = "0.2.0"
+version = "0.3.0"
 authors = [ "Tomas Tauber <2410580+tomtau@users.noreply.github.com>" ]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["main"]
@@ -25,7 +25,8 @@ structopt = "0.3"
 subtle-encoding = { version = "0.5", features = [ "bech32-preview" ] }
 sysinfo = { version = "0.20", optional = true }
 tempfile = "3"
-tendermint = { version = "0.22" }
+tendermint = { version = "0.23" }
+tendermint-config = { version = "0.23" }
 thiserror = "1"
 tmkms-light = { path = "../../.." }
 tokio = { version = "1", features = [ "rt" ] }

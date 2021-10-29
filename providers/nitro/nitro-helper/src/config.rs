@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::{convert::TryFrom, path::PathBuf};
 use structopt::StructOpt;
-use tendermint::{chain, net};
+use tendermint::chain;
+use tendermint_config::net;
 
 /// nitro options for toml configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

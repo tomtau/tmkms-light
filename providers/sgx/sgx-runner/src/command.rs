@@ -6,7 +6,7 @@ use crate::{shared::get_claim, shared::SgxInitResponse, SgxInitRequest};
 use rsa::pkcs1::ToRsaPublicKey;
 use std::fs;
 use std::path::PathBuf;
-use tendermint::net;
+use tendermint_config::net;
 use tmkms_light::{
     config::validator::ValidatorConfig,
     utils::{print_pubkey, PubkeyDisplay},
@@ -220,7 +220,7 @@ pub fn start(config_path: Option<PathBuf>, log_level: String) -> Result<(), Stri
                     &config.chain_id, &config.address
                 );
 
-                Some(path.clone())
+                Some(PathBuf::from(path))
             }
             _ => None,
         };

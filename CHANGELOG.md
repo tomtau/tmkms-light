@@ -1,3 +1,19 @@
+*October 29, 2021*
+
+Many dependency upgrades and NE improvements.
+Note that the version 0.2.0 contained a bug where production logging information from NE was sometimes lost.
+
+## v0.3.0
+### Breaking changes
+* [109](https://github.com/crypto-com/tmkms-light/pull/109) "launch-all" command in the NE helper
+
+### Improvements
+* [115](https://github.com/crypto-com/tmkms-light/pull/115) graceful process shutdown in NE
+
+### Bug Fixes
+* [109](https://github.com/crypto-com/tmkms-light/pull/109) production logging in NE fix
+
+
 *June 25, 2021*
 
 Dependency upgrades, logging and backup/recovery improvements.

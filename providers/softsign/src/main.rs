@@ -7,7 +7,7 @@ use std::{fs, path::PathBuf};
 use std::{net::TcpStream, time::Duration};
 use structopt::StructOpt;
 use subtle::ConstantTimeEq;
-use tendermint::net;
+use tendermint_config::net;
 use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
 use tmkms_light::connection::{Connection, PlainConnection};
 use tmkms_light::{

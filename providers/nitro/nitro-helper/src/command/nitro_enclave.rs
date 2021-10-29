@@ -76,7 +76,7 @@ fn parse_output<T: DeserializeOwned>(output: Output) -> Result<T, String> {
     if !output.status.success() {
         return Err(format!(
             "{}, status code: {:?}",
-            String::from_utf8_lossy(output.stderr.as_slice()).to_string(),
+            String::from_utf8_lossy(output.stderr.as_slice()),
             output.status.code(),
         ));
     }

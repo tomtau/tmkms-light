@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
 use std::{fs::OpenOptions, io, os::unix::fs::OpenOptionsExt, path::Path};
 use structopt::StructOpt;
-use tendermint::{chain, net};
+use tendermint::chain;
+use tendermint_config::net;
 use tmkms_light::utils::PubkeyDisplay;
 use tracing::error;
 
