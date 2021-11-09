@@ -124,14 +124,14 @@ jobs:
           push: false
           file: Dockerfile.nitro
           build-args: |
-            RUST_TOOLCHAIN=1.56.0
+            RUST_TOOLCHAIN=1.56.1
   run-integration-tests:
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v1
-      - uses: cachix/install-nix-action@v12
-      - uses: cachix/cachix-action@v8
+      - uses: cachix/install-nix-action@v14
+      - uses: cachix/cachix-action@v10
         with:
           name: crypto-com
           skipPush: true
@@ -139,4 +139,4 @@ jobs:
         with:
           name: tmkms-softsign
           path: integration-test
-      - run: cd integration-test && tar -xvf tmkms-softsign.tar && chmod +x tmkms-softsign && ./run.sh
+      - run: cd integration-test && tar -xvf tmkms-softsign.tar && chmod +x tmkms-softsign && nix develop --extra-experimental-features nix-command --extra-experimental-features flakes -c ./run.sh 

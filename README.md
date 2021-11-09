@@ -128,7 +128,7 @@ $ docker build -t aws-ne-build \
        --build-arg USER=$(whoami) \
        --build-arg USER_ID=$(id -u) \
        --build-arg GROUP_ID=$(id -g) \
-       --build-arg RUST_TOOLCHAIN="1.56.0" \
+       --build-arg RUST_TOOLCHAIN="1.56.1" \
        --build-arg CTR_HOME="$CTR_HOME" \
        -f Dockerfile.nitro .
 ```
