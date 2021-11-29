@@ -42,4 +42,4 @@ def test_basic():
     validator_address = block['result']['block']['last_commit']['signatures'][0]['validator_address']
     genesis_path = tmhome + "/config/genesis.json"
     genesis = json.loads(Path(genesis_path).read_text())
-    assert validator_address == genesis["validators"][0]["address"]
+    assert validator_address == genesis["validators"][0]["address"].upper()

@@ -2390,9 +2390,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50d1cdb0236becb17ab35a2ed1566503e412fd910944dc940239857bb7663652"
+checksum = "02880339f0e89dc7de809cb300a7dbe5e066c71937a7a55472438ae02e4a841b"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",

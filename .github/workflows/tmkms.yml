@@ -62,6 +62,7 @@ jobs:
           --ignore RUSTSEC-2020-0159
           --ignore RUSTSEC-2021-0121
           --ignore RUSTSEC-2019-0036
+          --ignore RUSTSEC-2021-0124
   
   build:
     runs-on: ubuntu-latest
