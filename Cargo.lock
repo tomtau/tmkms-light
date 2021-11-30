@@ -2419,9 +2419,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-config"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a1f94250d30e3011130a09756b05985d8dbfbd562cf261b5a17e36d89a37992"
+checksum = "2aff01e0eacdcfb75e8a1bbbc2d71286f7b6db3eda82c52ad7ca4f619ebb90cc"
 dependencies = [
  "flex-error",
  "serde",
