@@ -21,7 +21,7 @@ zeroize = "1"
 anomaly = "0.2"
 aesm-client = { version = "0.5", features = ["sgxs"] }
 dcap-ql = "0.3"
-enclave-runner = "0.4"
+enclave-runner = "0.5"
 serde_json = "1"
 sgxs-loaders = "0.3"
 structopt = "0.3"
