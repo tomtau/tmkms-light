@@ -14,14 +14,12 @@ fn main() {
     let mut env_args = std::env::args();
     let port = env_args
         .next()
-        .map(|x| x.parse::<u32>().ok())
-        .flatten()
+        .and_then(|x| x.parse::<u32>().ok())
         .unwrap_or(5050);
 
     let log_server_port = env_args
         .next()
-        .map(|x| x.parse::<u32>().ok())
-        .flatten()
+        .and_then(|x| x.parse::<u32>().ok())
         .unwrap_or(6050);
 
     let log_level = env_args
