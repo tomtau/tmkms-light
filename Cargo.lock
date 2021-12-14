@@ -2442,9 +2442,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-p2p"
-version = "0.23.1"
+version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82fb1ca942ff50615ea2abe71761bd931161b8d085790be894046a4dea9b4274"
+checksum = "fed806ac8705707267a7c2e6e3ecc33287544034731f77363743829fa2340cbb"
 dependencies = [
  "aead",
  "chacha20poly1305",
@@ -2486,9 +2486,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-std-ext"
-version = "0.23.1"
+version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bad0442d855704801e02536dc6f68b11a01423347a6882c06c49b0dfb6b409ec"
+checksum = "639aa7d263d01da5ca847bae5453de683b28cc8070544c66ed60fce140cd7823"
 
 [[package]]
 name = "textwrap"
