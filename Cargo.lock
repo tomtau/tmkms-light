@@ -518,7 +518,7 @@ version = "3.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a19c6cedffdc8c03a3346d723eb20bd85a13362bb96dc2ac000842c6381ec7bf"
 dependencies = [
- "nix 0.23.0",
+ "nix 0.23.1",
  "winapi 0.3.9",
 ]
 
@@ -1402,9 +1402,9 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f305c2c2e4c39a82f7bf0bf65fb557f9070ce06781d4f2454295cc34b1c43188"
+checksum = "9f866317acbd3a240710c63f065ffb1e4fd466259045ccb504130b7f668f35c6"
 dependencies = [
  "bitflags",
  "cc",
@@ -2637,7 +2637,7 @@ dependencies = [
  "anomaly",
  "aws-ne-sys",
  "ed25519-dalek",
- "nix 0.23.0",
+ "nix 0.23.1",
  "nsm-driver",
  "nsm-io",
  "rand_core 0.6.3",
@@ -2665,7 +2665,7 @@ dependencies = [
  "ctrlc",
  "ed25519",
  "ed25519-dalek",
- "nix 0.23.0",
+ "nix 0.23.1",
  "rand_core 0.6.3",
  "reqwest",
  "secrecy",
@@ -3002,7 +3002,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e32675ee2b3ce5df274c0ab52d19b28789632406277ca26bffee79a8e27dc133"
 dependencies = [
  "libc",
- "nix 0.23.0",
+ "nix 0.23.1",
 ]
 
 [[package]]
