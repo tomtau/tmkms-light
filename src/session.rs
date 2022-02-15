@@ -2,13 +2,12 @@
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
 use crate::{
-    chain::state::{PersistStateSync, State, StateErrorKind},
+    chain::state::{PersistStateSync, State, StateError, StateErrorDetail},
     config::validator::ValidatorConfig,
     connection::Connection,
-    error::{Error, ErrorKind},
+    error::Error,
     rpc::{ChainIdErrorType, DoubleSignErrorType, Request, Response},
 };
-use anomaly::{fail, format_err};
 use ed25519_dalek::{Keypair, Signer};
 use std::time::Instant;
 use tendermint_proto::privval::PingResponse;
@@ -58,7 +57,7 @@ impl<S: PersistStateSync> Session<S> {
         if chain_id == &self.config.chain_id {
             Ok(())
         } else {
-            fail!(ErrorKind::ChainIdError, "invalid chain id: {:?}", chain_id)
+            Err(Error::chain_id_error(chain_id.to_string()))
         }
     }
 
@@ -67,16 +66,10 @@ impl<S: PersistStateSync> Session<S> {
     fn check_max_height(&self, request_height: i64) -> Result<(), Error> {
         if let Some(max_height) = self.config.max_height {
             if request_height > max_height.value() as i64 {
-                fail!(
-                    ErrorKind::ExceedMaxHeight,
-                    "attempted to sign at height {} which is greater than {}",
-                    request_height,
-                    max_height,
-                );
+                return Err(Error::exceed_max_height(request_height, max_height.into()));
             }
         }
-
-        Ok(())
+            Ok(())
     }
 
     /// Main request loop
@@ -106,11 +99,7 @@ impl<S: PersistStateSync> Session<S> {
                     {
                         Ok(_) => {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
-                                format_err!(
-                                    ErrorKind::SigningError,
-                                    "cannot get proposal signable bytes: {}",
-                                    e
-                                )
+                                Error::signing_tendermint_error("can't get proposal signable bytes".into(), e.into())
                             })?;
                             let started_at = Instant::now();
                             let signature = self.signing_key.sign(&signable_bytes);
@@ -123,7 +112,7 @@ impl<S: PersistStateSync> Session<S> {
                             );
                             Response::proposal_response(req, signature)
                         }
-                        Err(e) if e.kind() == &StateErrorKind::DoubleSign => {
+                        Err(e) if e == StateError::double_sign_error() => {
                             // Report double signing error back to the validator
                             let original_block_id = self.state.consensus_state().block_id_prefix();
 
@@ -140,7 +129,7 @@ impl<S: PersistStateSync> Session<S> {
                                 req_cs.height.into(),
                             )
                         }
-                        Err(e) => fail!(ErrorKind::SigningError, "failed signing proposal: {}", e),
+                        Err(e) => Err(Error::signing_state_error("failed signing proposal".into(), e)),
                     }
                 }
             }
@@ -157,11 +146,7 @@ impl<S: PersistStateSync> Session<S> {
                     {
                         Ok(_) => {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
-                                format_err!(
-                                    ErrorKind::SigningError,
-                                    "cannot get vote signable bytes: {}",
-                                    e
-                                )
+                                Err(Error::signing_tendermint_error("cannot get vote signable bytes".to_string(), e.into()))
                             })?;
                             let started_at = Instant::now();
                             let signature = self.signing_key.sign(&signable_bytes);
@@ -174,7 +159,7 @@ impl<S: PersistStateSync> Session<S> {
                             );
                             Response::vote_response(req, signature)
                         }
-                        Err(e) if e.kind() == &StateErrorKind::DoubleSign => {
+                        Err(StateError::DoubleSign) => {
                             // Report double signing error back to the validator
                             let original_block_id = self.state.consensus_state().block_id_prefix();
 
@@ -188,7 +173,7 @@ impl<S: PersistStateSync> Session<S> {
 
                             Response::double_sign(DoubleSignErrorType::Vote, req_cs.height.into())
                         }
-                        Err(e) => fail!(ErrorKind::SigningError, "failed signing vote: {}", e),
+                        Err(e) => Err(Error::signing_state_error("failed signing vote".into(), e)),
                     }
                 }
             }
@@ -210,7 +195,7 @@ impl<S: PersistStateSync> Session<S> {
         let response_bytes = response.encode()?;
         self.connection
             .write_all(&response_bytes)
-            .map_err(|e| format_err!(ErrorKind::IoError, "write response failed: {}", e))?;
+            .map_err(|e| Error::io_error("write response failed".into(), e))?;
 
         Ok(true)
     }

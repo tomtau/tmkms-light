@@ -92,15 +92,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anomaly"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "550632e31568ae1a5f47998c3aa48563030fc49b9ec91913ca337cf64fbc5ccb"
-dependencies = [
- "backtrace",
-]
-
-[[package]]
 name = "ansi_term"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -701,6 +692,7 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c606d892c9de11507fa0dcffc116434f94e105d0bbdc4e405b61519464c49d7b"
 dependencies = [
+ "anyhow",
  "eyre",
  "paste",
 ]
@@ -2576,8 +2568,8 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 name = "tmkms-light"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "ed25519-dalek",
+ "flex-error",
  "prost",
  "serde",
  "subtle-encoding",
@@ -2595,9 +2587,9 @@ dependencies = [
  "aes",
  "aes-gcm-siv",
  "aes-keywrap-rs",
- "anomaly",
  "base64",
  "ed25519-dalek",
+ "flex-error",
  "quickcheck",
  "quickcheck_macros",
  "rand",
@@ -2620,12 +2612,12 @@ name = "tmkms-light-sgx-runner"
 version = "0.3.0"
 dependencies = [
  "aesm-client",
- "anomaly",
  "base64",
  "dcap-ql",
  "ed25519",
  "ed25519-dalek",
  "enclave-runner",
+ "flex-error",
  "rsa",
  "serde",
  "serde_json",
@@ -2649,9 +2641,9 @@ dependencies = [
 name = "tmkms-nitro-enclave"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "aws-ne-sys",
  "ed25519-dalek",
+ "flex-error",
  "nix 0.23.1",
  "nsm-driver",
  "nsm-io",
@@ -2674,12 +2666,12 @@ dependencies = [
 name = "tmkms-nitro-helper"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "bytes 0.5.6",
  "chrono",
  "ctrlc",
  "ed25519",
  "ed25519-dalek",
+ "flex-error",
  "nix 0.23.1",
  "rand_core 0.6.3",
  "reqwest",
@@ -2706,8 +2698,8 @@ dependencies = [
 name = "tmkms-softsign"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "ed25519-dalek",
+ "flex-error",
  "rand_core 0.6.3",
  "serde",
  "serde_json",

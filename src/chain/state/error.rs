@@ -2,42 +2,27 @@
 //! Copyright (c) 2018-2021 Iqlusion Inc. (licensed under the Apache License, Version 2.0)
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
-use anomaly::{BoxError, Context};
-use thiserror::Error;
+use flex_error::define_error;
 
-pub type StateError = anomaly::Error<StateErrorKind>;
+define_error! {
+    StateError {
+        HeightRegressionError {}
+        |_| {
+            "height regression"
+        },
 
-/// Kinds of errors
-#[derive(Copy, Clone, Debug, Error, Eq, PartialEq)]
-pub enum StateErrorKind {
-    /// Height regressed
-    #[error("height regression")]
-    HeightRegression,
+        StepRegressionError {} |_| {
+            "step regression"
+        },
 
-    /// Step regressed
-    #[error("step regression")]
-    StepRegression,
-
-    /// Round regressed
-    #[error("round regression")]
-    RoundRegression,
-
-    /// Double sign detected
-    #[error("double sign detected")]
-    DoubleSign,
-
-    /// Error syncing state
-    #[error("error syncing state")]
-    SyncError,
-}
-
-impl StateErrorKind {
-    /// Add additional context (i.e. include a source error and capture
-    /// a backtrace).
-    ///
-    /// You can convert the resulting `Context` into an `Error` by calling
-    /// `.into()`.
-    pub fn context(self, source: impl Into<BoxError>) -> Context<StateErrorKind> {
-        Context::new(self, Some(source.into()))
+        RoundRegressionError {} |_| {
+            "round regression"
+        },
+        DoubleSignError{} |_| {
+            "double sign detected"
+        },
+        SyncError{} |_| {
+            "error syncing state"
+        },
     }
 }

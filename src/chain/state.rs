@@ -2,7 +2,7 @@
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
 mod error;
-pub use self::error::{StateError, StateErrorKind};
+pub use self::error::{StateError, StateErrorDetail};
 use anomaly::fail;
 pub use tendermint::consensus;
 use tendermint::{proposal::SignProposalRequest, vote::SignVoteRequest};
