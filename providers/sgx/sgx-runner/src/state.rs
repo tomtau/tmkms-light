@@ -1,4 +1,3 @@
-use anomaly::{fail, format_err};
 use std::os::unix::net::UnixStream;
 use std::thread;
 use std::{
@@ -7,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tempfile::NamedTempFile;
-use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
+use tmkms_light::chain::state::{consensus, StateError};
 use tmkms_light::utils::read_u16_payload;
 use tracing::{debug, warn};
 
@@ -24,27 +23,18 @@ impl StateSyncer {
         let state_file_path = path.as_ref().to_owned();
         let state = match fs::read_to_string(&path) {
             Ok(state_json) => {
-                let consensus_state: consensus::State =
-                    serde_json::from_str(&state_json).map_err(|e| {
-                        format_err!(
-                            StateErrorKind::SyncError,
-                            "error parsing {}: {}",
-                            path.as_ref().display(),
-                            e
-                        )
-                    })?;
+                let consensus_state: consensus::State = serde_json::from_str(&state_json)
+                    .map_err(|e| StateError::sync_enc_dec_error("error parsing".into(), e))?;
 
                 Ok(consensus_state)
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 Self::write_initial_state(&state_file_path)
             }
-            Err(e) => fail!(
-                StateErrorKind::SyncError,
-                "error reading {}: {}",
-                path.as_ref().display(),
-                e
-            ),
+            Err(e) => Err(StateError::sync_error(
+                path.as_ref().display().to_string(),
+                e,
+            )),
         }?;
         Ok((
             Self {
@@ -58,15 +48,10 @@ impl StateSyncer {
     /// load state from the provided vsock stream
     fn sync_from_stream(&mut self) -> Result<consensus::State, StateError> {
         let json_raw = read_u16_payload(&mut self.stream_to_enclave)
-            .map_err(|e| format_err!(StateErrorKind::SyncError, "failed to read state: {}", e))?;
-        serde_json::from_slice(&json_raw).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "failed to deserialize state: {}",
-                e
-            )
-            .into()
-        })
+            .map_err(|e| StateError::sync_other_error(e.to_string()))?;
+
+        serde_json::from_slice(&json_raw)
+            .map_err(|e| StateError::sync_enc_dec_error("failed to deserialize state".into(), e))
     }
 
     /// Write the initial state to the given path on disk
@@ -99,43 +84,23 @@ impl StateSyncer {
             &new_state
         );
 
-        let json = serde_json::to_string(&new_state).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error serializing to json {}: {}",
-                path.display(),
-                e
-            )
-        })?;
+        let json = serde_json::to_string(&new_state)
+            .map_err(|e| StateError::sync_enc_dec_error(path.display().to_string(), e))?;
 
         let state_file_dir = path.parent().unwrap_or_else(|| {
             panic!("state file cannot be root directory");
         });
 
-        let mut state_file = NamedTempFile::new_in(state_file_dir).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error creating a named temp file {}: {}",
-                path.display(),
-                e
-            )
-        })?;
-        state_file.write_all(json.as_bytes()).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error writing {}: {}",
-                path.display(),
-                e
-            )
-        })?;
-        state_file.persist(&path).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error persisting {}: {}",
-                path.display(),
-                e
-            )
-        })?;
+        let mut state_file = NamedTempFile::new_in(state_file_dir)
+            .map_err(|e| StateError::sync_error(path.display().to_string(), e))?;
+
+        state_file
+            .write_all(json.as_bytes())
+            .map_err(|e| StateError::sync_error(path.display().to_string(), e))?;
+
+        state_file
+            .persist(&path)
+            .map_err(|e| StateError::sync_error(path.display().to_string(), e.error))?;
 
         debug!(
             "successfully wrote new consensus state to {}",

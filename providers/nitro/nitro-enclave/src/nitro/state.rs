@@ -1,7 +1,6 @@
-use anomaly::format_err;
 use std::io;
 use std::os::unix::io::AsRawFd;
-use tmkms_light::chain::state::{consensus, PersistStateSync, State, StateError, StateErrorKind};
+use tmkms_light::chain::state::{consensus, PersistStateSync, State, StateError};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tmkms_nitro_helper::VSOCK_HOST_CID;
 use tracing::{debug, trace};
@@ -32,9 +31,9 @@ impl PersistStateSync for StateHolder {
     /// loads the initial state
     fn load_state(&mut self) -> Result<State, StateError> {
         let json_raw = read_u16_payload(&mut self.state_conn)
-            .map_err(|e| format_err!(StateErrorKind::SyncError, "error reading state: {}", e))?;
+            .map_err(|e| StateError::sync_other_error(e.to_string()))?;
         let consensus_state: consensus::State = serde_json::from_slice(&json_raw)
-            .map_err(|e| format_err!(StateErrorKind::SyncError, "error parsing state: {}", e))?;
+            .map_err(|e| StateError::sync_enc_dec_error("vsock".into(), e))?;
         Ok(State::from(consensus_state))
     }
 
@@ -44,17 +43,11 @@ impl PersistStateSync for StateHolder {
         trace!("state peer addr: {:?}", self.state_conn.peer_addr());
         trace!("state local addr: {:?}", self.state_conn.local_addr());
         trace!("state fd: {}", self.state_conn.as_raw_fd());
-        let json_raw = serde_json::to_vec(&new_state).map_err(|e| {
-            format_err!(StateErrorKind::SyncError, "error serializing state: {}", e)
-        })?;
+        let json_raw = serde_json::to_vec(&new_state)
+            .map_err(|e| StateError::sync_enc_dec_error("vsock".into(), e))?;
 
-        write_u16_payload(&mut self.state_conn, &json_raw).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error state writting to socket {}",
-                e
-            )
-        })?;
+        write_u16_payload(&mut self.state_conn, &json_raw)
+            .map_err(|e| StateError::sync_error("vsock".into(), e))?;
 
         debug!("successfully wrote new consensus state to state connection");
 

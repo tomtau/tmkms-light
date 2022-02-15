@@ -2,42 +2,58 @@
 //! Copyright (c) 2018-2021 Iqlusion Inc. (licensed under the Apache License, Version 2.0)
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
-use anomaly::{BoxError, Context};
-use thiserror::Error;
+use flex_error::{define_error, DetailOnly};
+use tendermint::block::{Height, Round};
 
-pub type StateError = anomaly::Error<StateErrorKind>;
+define_error! {
+    StateError {
+        HeightRegressionError {
+            last_height: Height,
+            new_height: Height,
+        }
+        |e| {
+            format_args!("last height:{} new height:{}", e.last_height, e.new_height)
+        },
 
-/// Kinds of errors
-#[derive(Copy, Clone, Debug, Error, Eq, PartialEq)]
-pub enum StateErrorKind {
-    /// Height regressed
-    #[error("height regression")]
-    HeightRegression,
+        RoundRegressionError {
+            height: Height,
+            last_round: Round,
+            new_round: Round,
+        } |e| {
+            format_args!("round regression at height:{} last round:{} new round:{}", e.height, e.last_round, e.new_round)
+        },
 
-    /// Step regressed
-    #[error("step regression")]
-    StepRegression,
-
-    /// Round regressed
-    #[error("round regression")]
-    RoundRegression,
-
-    /// Double sign detected
-    #[error("double sign detected")]
-    DoubleSign,
-
-    /// Error syncing state
-    #[error("error syncing state")]
-    SyncError,
-}
-
-impl StateErrorKind {
-    /// Add additional context (i.e. include a source error and capture
-    /// a backtrace).
-    ///
-    /// You can convert the resulting `Context` into an `Error` by calling
-    /// `.into()`.
-    pub fn context(self, source: impl Into<BoxError>) -> Context<StateErrorKind> {
-        Context::new(self, Some(source.into()))
+        StepRegressionError {
+            height: Height,
+            round: Round,
+            last_step: i8,
+            new_step: i8,
+        } |e| {
+            format_args!("round regression at height:{} round:{} last step:{} new step:{}", e.height, e.round, e.last_step, e.new_step)
+        },
+        DoubleSignError{
+            height: Height,
+            round: Round,
+            step: i8,
+            old_block_id: String,
+            new_block_id: String,
+        } |e| {
+            format_args!("Attempting to sign a second proposal at height:{} round:{} step:{} old block id:{} new block {}", e.height, e.round, e.step, e.old_block_id, e.new_block_id)
+        },
+        SyncError{
+            path: String,
+        } [DetailOnly<std::io::Error>] |e| {
+            format_args!("Error syncing {}", e.path)
+        },
+        SyncEncDecError{
+            path_or_msg: String,
+        } [DetailOnly<serde_json::Error>] |e| {
+            format_args!("Error parsing or serializing in syncing {}", e.path_or_msg)
+        },
+        SyncOtherError{
+            error_message: String,
+        } |e| {
+            format_args!("Error state syncing: {}", e.error_message)
+        },
     }
 }

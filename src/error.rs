@@ -2,94 +2,94 @@
 //! Copyright (c) 2018-2021 Iqlusion Inc. (licensed under the Apache License, Version 2.0)
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
-use anomaly::{BoxError, Context};
-use thiserror::Error;
+use flex_error::define_error;
+use flex_error::DetailOnly;
 
-/// Kinds of errors
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Error)]
-pub enum ErrorKind {
-    /// Access denied
-    #[error("access denied")]
-    AccessError,
+define_error! {
+    Error {
+        SigningTendermintError { error: String }
+        [ DetailOnly<tendermint_proto::Error> ]
+        |e| {
+            e.error.clone()
+        },
+        SigningStateError { error: String }
+        [ DetailOnly<crate::chain::state::StateError> ]
+        |e| {
+            e.error.clone()
+        },
+        AccessError {
+        } |_| {
+            "Access Denied"
+        },
 
-    /// Invalid Chain ID
-    #[error("chain ID error")]
-    ChainIdError,
+        ChainIdError {
+            chain_id: String,
+        } |e| {
+            format_args!("chain ID error: {}", e.chain_id)
+        },
 
-    /// Error in configuration file
-    #[error("config error")]
-    ConfigError,
+        DoubleSign {
+        } |_| {
+            "Attempted double sign"
+        },
 
-    /// Double sign attempted
-    #[error("attempted double sign")]
-    DoubleSign,
+        ExceedMaxHeight {
+            request_height: i64,
+            max_height: u64,
+        } |e| {
+            format_args!("attempted to sign at height {} which is greater than {}", e.request_height, e.max_height)
+        },
 
-    /// Request a signature above max height
-    #[error("requested signature above stop height")]
-    ExceedMaxHeight,
+        InvalidKeyError {
+        } |_| {
+            "invalid key"
+        },
 
-    /// Cryptographic operation failed
-    #[error("cryptographic error")]
-    CryptoError,
+        IoError { error: String }
+        [ DetailOnly<std::io::Error> ]
+        |e| {
+            e.error.clone()
+        },
 
-    /// Error running a subcommand to update chain state
-    #[error("subcommand hook failed")]
-    HookError,
+        PanicError {
+        } |_| {
+            "internal crash"
+        },
 
-    /// Malformatted or otherwise invalid cryptographic key
-    #[error("invalid key")]
-    InvalidKey,
+        ProtocolError { error: String }
+        [ DetailOnly<std::io::Error> ]
+        |e| {
+            e.error.clone()
+        },
 
-    /// Validation of consensus message failed
-    #[error("invalid consensus message")]
-    InvalidMessageError,
+        ProtocolErrorTendermint { error: String }
+        [ DetailOnly<tendermint::Error> ]
+        |e| {
+            e.error.clone()
+        },
 
-    /// Input/output error
-    #[error("I/O error")]
-    IoError,
+        ProtocolErrorMsg { error: String }
+        [ DetailOnly<std::option::Option<tendermint_proto::privval::message::Sum>> ]
+        |e| {
+            e.error.clone()
+        },
 
-    /// KMS internal panic
-    #[error("internal crash")]
-    PanicError,
+        SerializationError {
+        }  [ DetailOnly<serde_json::Error> ] |e| {
+            format_args!("serialization error: {}", e)
+        },
 
-    /// Parse error
-    #[error("parse error")]
-    ParseError,
-
-    /// KMS state has been poisoned
-    #[error("internal state poisoned")]
-    PoisonError,
-
-    /// Network protocol-related errors
-    #[error("protocol error")]
-    ProtocolError,
-
-    /// Serialization error
-    #[error("serialization error")]
-    SerializationError,
-
-    /// Signing operation failed
-    #[error("signing operation failed")]
-    SigningError,
-
-    /// Errors originating in the Tendermint crate
-    #[error("Tendermint error")]
-    TendermintError,
-
-    /// Verification operation failed
-    #[error("verification failed")]
-    VerificationError,
-}
-
-impl ErrorKind {
-    /// Add additional context (i.e. include a source error and capture
-    /// a backtrace).
-    ///
-    /// You can convert the resulting `Context` into an `Error` by calling
-    /// `.into()`.
-    pub fn context(self, source: impl Into<BoxError>) -> Context<ErrorKind> {
-        Context::new(self, Some(source.into()))
     }
 }
 
-pub type Error = anomaly::Error<ErrorKind>;
+/// Wraps IO-related error from a different source into an IO error
+/// as a kind Other
+pub fn io_error_wrap<E: Into<Box<dyn std::error::Error + Send + Sync>>>(
+    message: String,
+    error: E,
+) -> Error {
+    Error::io_error(
+        message,
+        std::io::Error::new(std::io::ErrorKind::Other, error),
+    )
+}

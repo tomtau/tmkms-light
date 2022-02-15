@@ -1,5 +1,4 @@
 use crate::shared::VSOCK_HOST_CID;
-use anomaly::{fail, format_err};
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::thread;
@@ -9,7 +8,8 @@ use std::{
     path::{Path, PathBuf},
 };
 use tempfile::NamedTempFile;
-use tmkms_light::chain::state::{consensus, StateError, StateErrorKind};
+use tmkms_light::chain::state::{consensus, StateError};
+use tmkms_light::error::{io_error_wrap, Error};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tracing::{debug, info, warn};
 use vsock::{SockAddr, VsockListener, VsockStream};
@@ -32,12 +32,7 @@ impl StateSyncer {
             Ok(state_json) => {
                 let consensus_state: consensus::State =
                     serde_json::from_str(&state_json).map_err(|e| {
-                        format_err!(
-                            StateErrorKind::SyncError,
-                            "error parsing {}: {}",
-                            path.as_ref().display(),
-                            e
-                        )
+                        StateError::sync_enc_dec_error(path.as_ref().display().to_string(), e)
                     })?;
 
                 Ok(consensus_state)
@@ -45,22 +40,15 @@ impl StateSyncer {
             Err(e) if e.kind() == io::ErrorKind::NotFound => {
                 Self::write_initial_state(&state_file_path)
             }
-            Err(e) => fail!(
-                StateErrorKind::SyncError,
-                "error reading {}: {}",
-                path.as_ref().display(),
-                e
-            ),
+            Err(e) => Err(StateError::sync_error(
+                path.as_ref().display().to_string(),
+                e,
+            )),
         }?;
 
         let sockaddr = SockAddr::new_vsock(VSOCK_HOST_CID, vsock_port);
-        let vsock_listener = VsockListener::bind(&sockaddr).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "failed to listen on vsock: {}",
-                e
-            )
-        })?;
+        let vsock_listener = VsockListener::bind(&sockaddr)
+            .map_err(|e| StateError::sync_error("vsock".into(), e))?;
 
         Ok(Self {
             state_file_path,
@@ -83,30 +71,15 @@ impl StateSyncer {
 
     /// dump the current state to the provided vsock stream
     fn sync_to_stream(&self, stream: &mut VsockStream) -> Result<(), StateError> {
-        let json_raw = serde_json::to_vec(&self.state).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "failed to serialize state: {}",
-                e
-            )
-        })?;
-        write_u16_payload(stream, &json_raw).map_err(|e| {
-            format_err!(StateErrorKind::SyncError, "failed to write state: {}", e).into()
-        })
+        let json_raw = serde_json::to_vec(&self.state)
+            .map_err(|e| StateError::sync_enc_dec_error("vsock".into(), e))?;
+        write_u16_payload(stream, &json_raw).map_err(|e| StateError::sync_error("vsock".into(), e))
     }
 
     /// load state from the provided vsock stream
-    fn sync_from_stream(mut stream: &mut VsockStream) -> Result<consensus::State, StateError> {
-        let json_raw = read_u16_payload(&mut stream)
-            .map_err(|e| format_err!(StateErrorKind::SyncError, "failed to read state: {}", e))?;
-        serde_json::from_slice(&json_raw).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "failed to deserialize state: {}",
-                e
-            )
-            .into()
-        })
+    fn sync_from_stream(mut stream: &mut VsockStream) -> Result<consensus::State, Error> {
+        let json_raw = read_u16_payload(&mut stream)?;
+        serde_json::from_slice(&json_raw).map_err(|e| io_error_wrap("parse error".into(), e))
     }
 
     /// Launches the state syncer, when get data from stop_recv, the thread will be finished
@@ -159,43 +132,21 @@ impl StateSyncer {
             &new_state
         );
 
-        let json = serde_json::to_string(&new_state).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error serializing to json {}: {}",
-                path.display(),
-                e
-            )
-        })?;
+        let json = serde_json::to_string(&new_state)
+            .map_err(|e| StateError::sync_enc_dec_error(path.display().to_string(), e))?;
 
         let state_file_dir = path.parent().unwrap_or_else(|| {
             panic!("state file cannot be root directory");
         });
 
-        let mut state_file = NamedTempFile::new_in(state_file_dir).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error creating a named temp file {}: {}",
-                path.display(),
-                e
-            )
-        })?;
-        state_file.write_all(json.as_bytes()).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error writing {}: {}",
-                path.display(),
-                e
-            )
-        })?;
-        state_file.persist(&path).map_err(|e| {
-            format_err!(
-                StateErrorKind::SyncError,
-                "error persisting {}: {}",
-                path.display(),
-                e
-            )
-        })?;
+        let mut state_file = NamedTempFile::new_in(state_file_dir)
+            .map_err(|e| StateError::sync_error(path.display().to_string(), e))?;
+        state_file
+            .write_all(json.as_bytes())
+            .map_err(|e| StateError::sync_error(path.display().to_string(), e))?;
+        state_file
+            .persist(&path)
+            .map_err(|e| StateError::sync_error(path.display().to_string(), e.error))?;
 
         debug!(
             "successfully wrote new consensus state to {}",

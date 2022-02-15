@@ -7,12 +7,11 @@ use std::{
     path::Path,
 };
 
-use anomaly::format_err;
 use ed25519_dalek as ed25519;
 use ed25519_dalek::SECRET_KEY_LENGTH;
 use rand_core::{OsRng, RngCore};
 use subtle_encoding::base64;
-use tmkms_light::error::{Error, ErrorKind};
+use tmkms_light::error::{io_error_wrap, Error};
 use zeroize::Zeroizing;
 
 /// File permissions for secret data
@@ -22,21 +21,17 @@ pub const SECRET_FILE_PERMS: u32 = 0o600;
 pub fn load_base64_secret(path: impl AsRef<Path>) -> Result<Zeroizing<Vec<u8>>, Error> {
     // TODO(tarcieri): check file permissions are correct
     let base64_data = Zeroizing::new(fs::read_to_string(path.as_ref()).map_err(|e| {
-        format_err!(
-            ErrorKind::IoError,
-            "couldn't read key from {}: {}",
-            path.as_ref().display(),
-            e
+        Error::io_error(
+            format!("couldn't read key from {}: {}", path.as_ref().display(), e),
+            e,
         )
     })?);
 
     // TODO(tarcieri): constant-time string trimming
     let data = Zeroizing::new(base64::decode(base64_data.trim_end()).map_err(|e| {
-        format_err!(
-            ErrorKind::IoError,
-            "can't decode key from `{}`: {}",
-            path.as_ref().display(),
-            e
+        io_error_wrap(
+            format!("can't decode key from `{}`: {}", path.as_ref().display(), e),
+            e,
         )
     })?);
 
@@ -47,8 +42,8 @@ pub fn load_base64_secret(path: impl AsRef<Path>) -> Result<Zeroizing<Vec<u8>>, 
 pub fn load_base64_ed25519_key(path: impl AsRef<Path>) -> Result<ed25519::Keypair, Error> {
     let key_bytes = load_base64_secret(path)?;
 
-    let secret = ed25519::SecretKey::from_bytes(&*key_bytes)
-        .map_err(|e| format_err!(ErrorKind::InvalidKey, "invalid Ed25519 key: {}", e))?;
+    let secret =
+        ed25519::SecretKey::from_bytes(&*key_bytes).map_err(|_e| Error::invalid_key_error())?;
 
     let public = ed25519::PublicKey::from(&secret);
     Ok(ed25519::Keypair { secret, public })
@@ -66,13 +61,10 @@ pub fn write_base64_secret(path: impl AsRef<Path>, data: &[u8]) -> Result<(), Er
         .open(path.as_ref())
         .and_then(|mut file| file.write_all(&*base64_data))
         .map_err(|e| {
-            format_err!(
-                ErrorKind::IoError,
-                "couldn't write `{}`: {}",
-                path.as_ref().display(),
-                e
+            Error::io_error(
+                format!("couldn't write `{}`: {}", path.as_ref().display(), e),
+                e,
             )
-            .into()
         })
 }
 

@@ -103,15 +103,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anomaly"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "550632e31568ae1a5f47998c3aa48563030fc49b9ec91913ca337cf64fbc5ccb"
-dependencies = [
- "backtrace",
-]
-
-[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1016,6 +1007,7 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c606d892c9de11507fa0dcffc116434f94e105d0bbdc4e405b61519464c49d7b"
 dependencies = [
+ "anyhow",
  "eyre",
  "paste",
 ]
@@ -1219,9 +1211,9 @@ checksum = "78cc372d058dcf6d5ecd98510e7fbc9e5aec4d21de70f65fea8fecebcd881bd4"
 
 [[package]]
 name = "h2"
-version = "0.3.12"
+version = "0.3.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62eeb471aa3e3c9197aa4bfeabfe02982f6dc96f750486c0bb0009ac58b26d2b"
+checksum = "37a82c6d637fc9515a4694bbf1cb2457b79d81ce52b3108bdeea58b07dd34a57"
 dependencies = [
  "bytes 1.1.0",
  "fnv",
@@ -1409,9 +1401,9 @@ dependencies = [
 
 [[package]]
 name = "inout"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e1f03d4ab4d5dc9ec2d219f86c15d2a15fc08239d1cd3b2d6a19717c0a2f443"
+checksum = "a0c10553d664a4d0bcff9f4215d0aac67a639cc68ef660840afe309b807bc9f5"
 dependencies = [
  "generic-array",
 ]
@@ -2951,10 +2943,11 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 name = "tmkms-light"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "ed25519-dalek",
+ "flex-error",
  "prost",
  "serde",
+ "serde_json",
  "subtle-encoding",
  "tendermint",
  "tendermint-p2p",
@@ -2970,9 +2963,9 @@ dependencies = [
  "aes 0.8.1",
  "aes-gcm-siv",
  "aes-keywrap-rs",
- "anomaly",
  "base64",
  "ed25519-dalek",
+ "flex-error",
  "quickcheck",
  "quickcheck_macros",
  "rand",
@@ -2995,12 +2988,12 @@ name = "tmkms-light-sgx-runner"
 version = "0.3.0"
 dependencies = [
  "aesm-client",
- "anomaly",
  "base64",
  "dcap-ql",
  "ed25519",
  "ed25519-dalek",
  "enclave-runner",
+ "flex-error",
  "rsa",
  "serde",
  "serde_json",
@@ -3024,10 +3017,10 @@ dependencies = [
 name = "tmkms-nitro-enclave"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "aws-ne-sys",
  "aws-nitro-enclaves-nsm-api",
  "ed25519-dalek",
+ "flex-error",
  "nix 0.23.1",
  "rand_core 0.6.3",
  "serde_bytes",
@@ -3048,7 +3041,6 @@ dependencies = [
 name = "tmkms-nitro-helper"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "aws-config",
  "aws-types",
  "bytes 0.5.6",
@@ -3056,6 +3048,7 @@ dependencies = [
  "ctrlc",
  "ed25519",
  "ed25519-dalek",
+ "flex-error",
  "nix 0.23.1",
  "rand_core 0.6.3",
  "reqwest",
@@ -3082,8 +3075,8 @@ dependencies = [
 name = "tmkms-softsign"
 version = "0.3.0"
 dependencies = [
- "anomaly",
  "ed25519-dalek",
+ "flex-error",
  "rand_core 0.6.3",
  "serde",
  "serde_json",
@@ -3197,16 +3190,16 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.6.9"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e99e1983e5d376cd8eb4b66604d2e99e79f5bd988c3055891dcd8c9e2604cc0"
+checksum = "0edfdeb067411dba2044da6d1cb2df793dd35add7888d73c16e3381ded401764"
 dependencies = [
  "bytes 1.1.0",
  "futures-core",
  "futures-sink",
- "log",
  "pin-project-lite 0.2.8",
  "tokio 1.17.0",
+ "tracing",
 ]
 
 [[package]]

@@ -2,8 +2,7 @@
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
 mod error;
-pub use self::error::{StateError, StateErrorKind};
-use anomaly::fail;
+pub use self::error::{StateError, StateErrorDetail};
 pub use tendermint::consensus;
 use tendermint::{proposal::SignProposalRequest, vote::SignVoteRequest};
 /// State tracking for double signing prevention
@@ -26,12 +25,10 @@ impl State {
 
     fn check_height(&self, new_state: &consensus::State) -> Result<(), StateError> {
         if new_state.height < self.consensus_state.height {
-            fail!(
-                StateErrorKind::HeightRegression,
-                "last height:{} new height:{}",
+            return Err(StateError::height_regression_error(
                 self.consensus_state.height,
-                new_state.height
-            );
+                new_state.height,
+            ));
         }
         Ok(())
     }
@@ -40,13 +37,11 @@ impl State {
         if new_state.height == self.consensus_state.height
             && new_state.round < self.consensus_state.round
         {
-            fail!(
-                StateErrorKind::RoundRegression,
-                "round regression at height:{} last round:{} new round:{}",
+            return Err(StateError::round_regression_error(
                 new_state.height,
                 self.consensus_state.round,
-                new_state.round
-            )
+                new_state.round,
+            ));
         }
         Ok(())
     }
@@ -56,14 +51,12 @@ impl State {
             && new_state.round == self.consensus_state.round
             && new_state.step < self.consensus_state.step
         {
-            fail!(
-                StateErrorKind::StepRegression,
-                "round regression at height:{} round:{} last step:{} new step:{}",
+            return Err(StateError::step_regression_error(
                 new_state.height,
                 new_state.round,
                 self.consensus_state.step,
-                new_state.step
-            )
+                new_state.step,
+            ));
         }
         Ok(())
     }
@@ -77,15 +70,13 @@ impl State {
         // disallow voting `<nil>` and for a block ID on the same step
         (new_state.step == self.consensus_state.step)))
         {
-            fail!(
-                StateErrorKind::DoubleSign,
-                "Attempting to sign a second proposal at height:{} round:{} step:{} old block id:{} new block {}",
+            return Err(StateError::double_sign_error(
                 new_state.height,
                 new_state.round,
                 new_state.step,
                 self.consensus_state.block_id_prefix(),
-                new_state.block_id_prefix()
-            );
+                new_state.block_id_prefix(),
+            ));
         }
         Ok(())
     }
@@ -198,7 +189,10 @@ mod tests {
                 .check_consensus_state(&$new_state)
                 .expect_err("expected StateErrorKind::DoubleSign but succeeded");
 
-                assert_eq!(err.kind(), &StateErrorKind::DoubleSign)
+                assert!(matches!(
+                    err,
+                    StateError(StateErrorDetail::DoubleSignError(_), _)
+                ))
             }
         };
     }
