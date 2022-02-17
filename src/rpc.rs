@@ -39,29 +39,29 @@ impl Request {
 
         // Parse Protobuf-encoded request message
         let msg = PrivMessage::decode_length_delimited(msg.as_ref())
-            .map_err(|e| Error::protocol_error("malformed message packet: {}".into(), Err(e).unwrap()))?
+            .map_err(|e| Error::protocol_error("malformed message packet: {}".into(),e.into()))?
             .sum;
 
         match msg {
             Some(Sum::SignVoteRequest(req)) => {
                 let svr = SignVoteRequest::try_from(req).map_err(|e| {
-                    Error::protocol_error("sign vote request domain type error: {}".into(), Err(e).unwrap())})?;
+                    Error::protocol_error_tindermint("sign vote request domain type error: {}".into(), e)})?;
                 Ok(Request::SignVote(svr))
             }
             Some(Sum::SignProposalRequest(spr)) => {
                 let spr = SignProposalRequest::try_from(spr).map_err(|e| {
-                    Error::protocol_error("sign proposal request domain type error: {}".into(), Err(e).unwrap())
+                    Error::protocol_error_tindermint("sign proposal request domain type error: {}".into(), e)
                 })?;
                 Ok(Request::SignProposal(spr))
             }
             Some(Sum::PubKeyRequest(pkr)) => {
                 let pkr = PubKeyRequest::try_from(pkr).map_err(|e| {
-                    Error::protocol_error("pubkey request domain type error: {}".into(), Err(e).unwrap())
+                    Error::protocol_error_tindermint("pubkey request domain type error: {}".into(), e)
                 })?;
                 Ok(Request::ShowPublicKey(pkr))
             }
             Some(Sum::PingRequest(pr)) => Ok(Request::ReplyPing(pr)),
-            _ => Err(Error::protocol_error("invalid RPC message: {:?}".into(), Err(msg).unwrap())),
+            _ => Err(Error::protocol_error_msg("invalid RPC message: {:?}".into(), msg)),
         }
     }
 }
@@ -177,7 +177,7 @@ impl Response {
         PrivMessage { sum: Some(msg) }
             .encode_length_delimited(&mut buf)
             .map_err(|e| {
-                Error::protocol_error("failed to encode response: {}".into(), Err(e).unwrap())
+                Error::protocol_error("failed to encode response: {}".into(), e.into())
 
             })?;
         Ok(buf)
