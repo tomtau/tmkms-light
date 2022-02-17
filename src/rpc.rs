@@ -44,18 +44,18 @@ impl Request {
         match msg {
             Some(Sum::SignVoteRequest(req)) => {
                 let svr = SignVoteRequest::try_from(req).map_err(|e| {
-                    Error::protocol_error_tindermint("sign vote request domain type error: {}".into(), e)})?;
+                    Error::protocol_error_tendermint("sign vote request domain type error: {}".into(), e)})?;
                 Ok(Request::SignVote(svr))
             }
             Some(Sum::SignProposalRequest(spr)) => {
                 let spr = SignProposalRequest::try_from(spr).map_err(|e| {
-                    Error::protocol_error_tindermint("sign proposal request domain type error: {}".into(), e)
+                    Error::protocol_error_tendermint("sign proposal request domain type error: {}".into(), e)
                 })?;
                 Ok(Request::SignProposal(spr))
             }
             Some(Sum::PubKeyRequest(pkr)) => {
                 let pkr = PubKeyRequest::try_from(pkr).map_err(|e| {
-                    Error::protocol_error_tindermint("pubkey request domain type error: {}".into(), e)
+                    Error::protocol_error_tendermint("pubkey request domain type error: {}".into(), e)
                 })?;
                 Ok(Request::ShowPublicKey(pkr))
             }

@@ -92,7 +92,7 @@ define_error! {
             e.error
         },
 
-        ProtocolErrorTindermint { error: String }
+        ProtocolErrorTendermint { error: String }
         [ DetailOnly<tendermint::Error> ]
         |e| {
             e.error
