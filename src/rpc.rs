@@ -2,8 +2,7 @@
 //! Copyright (c) 2018-2021 Iqlusion Inc. (licensed under the Apache License, Version 2.0)
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
-use crate::error::{Error, ErrorKind};
-use anomaly::{fail, format_err};
+use crate::error::Error;
 use prost::Message as _;
 use std::convert::TryFrom;
 use std::io::Read;
@@ -32,6 +31,7 @@ pub enum Request {
     ReplyPing(PingRequest),
 }
 
+//Error::signing_tendermint_error(
 impl Request {
     /// Read a request from the given readable
     pub fn read(conn: &mut impl Read) -> Result<Self, Error> {
@@ -39,42 +39,29 @@ impl Request {
 
         // Parse Protobuf-encoded request message
         let msg = PrivMessage::decode_length_delimited(msg.as_ref())
-            .map_err(|e| format_err!(ErrorKind::ProtocolError, "malformed message packet: {}", e))?
+            .map_err(|e| Error::protocol_error("malformed message packet: {}".into(), Err(e).unwrap()))?
             .sum;
 
         match msg {
             Some(Sum::SignVoteRequest(req)) => {
                 let svr = SignVoteRequest::try_from(req).map_err(|e| {
-                    format_err!(
-                        ErrorKind::ProtocolError,
-                        "sign vote request domain type error: {}",
-                        e
-                    )
-                })?;
+                    Error::protocol_error("sign vote request domain type error: {}".into(), Err(e).unwrap())})?;
                 Ok(Request::SignVote(svr))
             }
             Some(Sum::SignProposalRequest(spr)) => {
                 let spr = SignProposalRequest::try_from(spr).map_err(|e| {
-                    format_err!(
-                        ErrorKind::ProtocolError,
-                        "sign proposal request domain type error: {}",
-                        e
-                    )
+                    Error::protocol_error("sign proposal request domain type error: {}".into(), Err(e).unwrap())
                 })?;
                 Ok(Request::SignProposal(spr))
             }
             Some(Sum::PubKeyRequest(pkr)) => {
                 let pkr = PubKeyRequest::try_from(pkr).map_err(|e| {
-                    format_err!(
-                        ErrorKind::ProtocolError,
-                        "pubkey request domain type error: {}",
-                        e
-                    )
+                    Error::protocol_error("pubkey request domain type error: {}".into(), Err(e).unwrap())
                 })?;
                 Ok(Request::ShowPublicKey(pkr))
             }
             Some(Sum::PingRequest(pr)) => Ok(Request::ReplyPing(pr)),
-            _ => fail!(ErrorKind::ProtocolError, "invalid RPC message: {:?}", msg),
+            _ => Err(Error::protocol_error("invalid RPC message: {:?}".into(), Err(msg).unwrap())),
         }
     }
 }
@@ -190,7 +177,8 @@ impl Response {
         PrivMessage { sum: Some(msg) }
             .encode_length_delimited(&mut buf)
             .map_err(|e| {
-                format_err!(ErrorKind::ProtocolError, "failed to encode response: {}", e)
+                Error::protocol_error("failed to encode response: {}".into(), Err(e).unwrap())
+
             })?;
         Ok(buf)
     }
@@ -202,7 +190,7 @@ fn read_msg(conn: &mut impl Read) -> Result<Vec<u8>, Error> {
     let mut buf = vec![0; DATA_MAX_SIZE];
     let buf_read = conn
         .read(&mut buf)
-        .map_err(|e| format_err!(ErrorKind::IoError, "read msg failed: {}", e))?;
+        .map_err(|e| Error::io_error("read msg failed: {}".into(), e))?;
     buf.truncate(buf_read);
     Ok(buf)
 }

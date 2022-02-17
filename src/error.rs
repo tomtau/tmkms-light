@@ -5,7 +5,6 @@
 use flex_error::define_error;
 use flex_error::DetailOnly;
 
-
 define_error! {
     Error {
         SigningTendermintError { error: String }
@@ -87,9 +86,10 @@ define_error! {
             "internal state poisoned"
         },
 
-        ProtocolError {
-        } |_| {
-            "protocol error"
+        ProtocolError { error: String }
+        [ DetailOnly<std::io::Error> ]
+        |e| {
+            e.error
         },
 
         SerializationError {

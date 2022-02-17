@@ -69,7 +69,7 @@ impl<S: PersistStateSync> Session<S> {
                 return Err(Error::exceed_max_height(request_height, max_height.into()));
             }
         }
-            Ok(())
+        Ok(())
     }
 
     /// Main request loop
@@ -99,7 +99,10 @@ impl<S: PersistStateSync> Session<S> {
                     {
                         Ok(_) => {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
-                                Error::signing_tendermint_error("can't get proposal signable bytes".into(), e.into())
+                                Error::signing_tendermint_error(
+                                    "can't get proposal signable bytes".into(),
+                                    e.into(),
+                                )
                             })?;
                             let started_at = Instant::now();
                             let signature = self.signing_key.sign(&signable_bytes);
@@ -112,7 +115,7 @@ impl<S: PersistStateSync> Session<S> {
                             );
                             Response::proposal_response(req, signature)
                         }
-                        Err(e) if e == StateError::double_sign_error() => {
+                        Err(StateError(StateErrorDetail::DoubleSignError(_), _)) => {
                             // Report double signing error back to the validator
                             let original_block_id = self.state.consensus_state().block_id_prefix();
 
@@ -129,7 +132,12 @@ impl<S: PersistStateSync> Session<S> {
                                 req_cs.height.into(),
                             )
                         }
-                        Err(e) => Err(Error::signing_state_error("failed signing proposal".into(), e)),
+                        Err(e) => {
+                            return Err(Error::signing_state_error(
+                                "failed signing proposal".into(),
+                                e,
+                            ))
+                        }
                     }
                 }
             }
@@ -146,7 +154,10 @@ impl<S: PersistStateSync> Session<S> {
                     {
                         Ok(_) => {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
-                                Err(Error::signing_tendermint_error("cannot get vote signable bytes".to_string(), e.into()))
+                                Error::signing_tendermint_error(
+                                    "cannot get vote signable bytes".into(),
+                                    e.into(),
+                                )
                             })?;
                             let started_at = Instant::now();
                             let signature = self.signing_key.sign(&signable_bytes);
@@ -159,7 +170,7 @@ impl<S: PersistStateSync> Session<S> {
                             );
                             Response::vote_response(req, signature)
                         }
-                        Err(StateError::DoubleSign) => {
+                        Err(StateError(StateErrorDetail::DoubleSignError(_), _)) => {
                             // Report double signing error back to the validator
                             let original_block_id = self.state.consensus_state().block_id_prefix();
 
@@ -173,7 +184,9 @@ impl<S: PersistStateSync> Session<S> {
 
                             Response::double_sign(DoubleSignErrorType::Vote, req_cs.height.into())
                         }
-                        Err(e) => Err(Error::signing_state_error("failed signing vote".into(), e)),
+                        Err(e) => {
+                            return Err(Error::signing_state_error("failed signing vote".into(), e))
+                        }
                     }
                 }
             }
