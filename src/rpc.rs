@@ -31,7 +31,6 @@ pub enum Request {
     ReplyPing(PingRequest),
 }
 
-//Error::signing_tendermint_error(
 impl Request {
     /// Read a request from the given readable
     pub fn read(conn: &mut impl Read) -> Result<Self, Error> {
