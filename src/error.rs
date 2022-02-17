@@ -92,6 +92,18 @@ define_error! {
             e.error
         },
 
+        ProtocolErrorTendermint { error: String }
+        [ DetailOnly<tendermint::Error> ]
+        |e| {
+            e.error
+        },
+
+        ProtocolErrorMsg { error: String }
+        [ DetailOnly<std::option::Option<tendermint_proto::privval::message::Sum>> ]
+        |e| {
+            e.error
+        },
+
         SerializationError {
         } |_| {
             "serialization error"
