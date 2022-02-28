@@ -93,12 +93,9 @@ dependencies = [
 
 [[package]]
 name = "anomaly"
-version = "0.2.0"
+version = "0.99.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "550632e31568ae1a5f47998c3aa48563030fc49b9ec91913ca337cf64fbc5ccb"
-dependencies = [
- "backtrace",
-]
+checksum = "99b3c39bef24889f744c03ae6a1fac9dc17ad1bc9a72b386af637cdd9a23530f"
 
 [[package]]
 name = "ansi_term"

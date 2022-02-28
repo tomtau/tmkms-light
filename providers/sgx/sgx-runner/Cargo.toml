@@ -18,7 +18,7 @@ tmkms-light = { path = "../../.." }
 zeroize = "1"
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
-anomaly = "0.2"
+anomaly = "0.99"
 aesm-client = { version = "0.5", features = ["sgxs"] }
 dcap-ql = "0.3"
 enclave-runner = "0.5"

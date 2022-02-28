@@ -5,7 +5,7 @@ authors = [ "Tomas Tauber <2410580+tomtau@users.noreply.github.com>" ]
 edition = "2021"
 
 [dependencies]
-anomaly = "0.2"
+anomaly = "0.99"
 aws-ne-sys = "0.4"
 ed25519-dalek = "1"
 nix = "0.23"

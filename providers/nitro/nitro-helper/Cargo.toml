@@ -9,7 +9,7 @@ default = ["main"]
 main = ["sysinfo", "reqwest"]
 
 [dependencies]
-anomaly = "0.2"
+anomaly = "0.99"
 bytes = "= 0.5"
 ctrlc = "3"
 chrono = "0.4"
