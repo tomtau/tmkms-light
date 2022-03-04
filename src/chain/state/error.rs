@@ -2,7 +2,7 @@
 //! Copyright (c) 2018-2021 Iqlusion Inc. (licensed under the Apache License, Version 2.0)
 //! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
 
-use flex_error::define_error;
+use flex_error::{define_error, DetailOnly};
 use tendermint::block::{Height, Round};
 
 define_error! {
@@ -40,8 +40,15 @@ define_error! {
         } |e| {
             format_args!("Attempting to sign a second proposal at height:{} round:{} step:{} old block id:{} new block {}", e.height, e.round, e.step, e.old_block_id, e.new_block_id)
         },
-        SyncError{} |_| {
-            "error syncing state"
+        SyncError{
+            path: String,
+        } [DetailOnly<std::io::Error>] |e| {
+            format_args!("Error syncing {}", e.path)
+        },
+        SyncParseError{
+            path: String,
+        } [DetailOnly<serde_json::Error>] |e| {
+            format_args!("Error parse syncing {}", e.path)
         },
     }
 }

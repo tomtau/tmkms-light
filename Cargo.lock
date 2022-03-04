@@ -2572,6 +2572,7 @@ dependencies = [
  "flex-error",
  "prost",
  "serde",
+ "serde_json",
  "subtle-encoding",
  "tendermint",
  "tendermint-p2p",
