@@ -10,12 +10,12 @@ define_error! {
         SigningTendermintError { error: String }
         [ DetailOnly<tendermint_proto::Error> ]
         |e| {
-            e.error
+            e.error.clone()
         },
         SigningStateError { error: String }
         [ DetailOnly<crate::chain::state::StateError> ]
         |e| {
-            e.error
+            e.error.clone()
         },
         AccessError {
         } |_| {
@@ -68,7 +68,7 @@ define_error! {
         IoError { error: String }
         [ DetailOnly<std::io::Error> ]
         |e| {
-            e.error
+            e.error.clone()
         },
 
         PanicError {
@@ -89,19 +89,19 @@ define_error! {
         ProtocolError { error: String }
         [ DetailOnly<std::io::Error> ]
         |e| {
-            e.error
+            e.error.clone()
         },
 
         ProtocolErrorTendermint { error: String }
         [ DetailOnly<tendermint::Error> ]
         |e| {
-            e.error
+            e.error.clone()
         },
 
         ProtocolErrorMsg { error: String }
         [ DetailOnly<std::option::Option<tendermint_proto::privval::message::Sum>> ]
         |e| {
-            e.error
+            e.error.clone()
         },
 
         SerializationError {
