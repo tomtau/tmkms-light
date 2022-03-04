@@ -50,5 +50,9 @@ define_error! {
         } [DetailOnly<serde_json::Error>] |e| {
             format_args!("Error parse syncing {}", e.path)
         },
+        SyncOtherError{
+        } |_| {
+            "Error state syncing"
+        },
     }
 }
