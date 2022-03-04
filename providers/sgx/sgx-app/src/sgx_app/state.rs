@@ -38,8 +38,9 @@ impl PersistStateSync for StateHolder {
             StateError::sync_parse_error("error serializing state: {}".to_string(), e)
         })?;
 
-        write_u16_payload(&mut self.state_conn, &json_raw)
-            .map_err(|e| StateError::sync_error("error state writting to socket {}".to_string(), e))?;
+        write_u16_payload(&mut self.state_conn, &json_raw).map_err(|e| {
+            StateError::sync_error("error state writting to socket {}".to_string(), e)
+        })?;
 
         debug!("successfully wrote new consensus state to state connection");
 
