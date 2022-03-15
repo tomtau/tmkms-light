@@ -7,17 +7,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-flex-error = "0.4"
 ed25519-dalek = "1"
+flex-error = "0.4"
 prost = "0.9"
 serde = { version = "1", features = ["serde_derive"] }
+serde_json = "1"
 subtle-encoding = { version = "0.5", features = ["bech32-preview"] }
 tendermint = { version = "0.23" }
 tendermint-proto = "0.23"
 tendermint-p2p = { version = "0.23" }
 thiserror = "1"
 tracing = "0.1"
-serde_json = "1"
 
 [workspace]
 members = ["providers/softsign", "providers/sgx/sgx-app", "providers/sgx/sgx-runner", "providers/nitro/nitro-enclave", "providers/nitro/nitro-helper"]

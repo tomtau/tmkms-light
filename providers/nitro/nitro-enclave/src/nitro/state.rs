@@ -30,8 +30,8 @@ impl StateHolder {
 impl PersistStateSync for StateHolder {
     /// loads the initial state
     fn load_state(&mut self) -> Result<State, StateError> {
-        let json_raw =
-            read_u16_payload(&mut self.state_conn).map_err(|_| StateError::sync_other_error())?;
+        let json_raw = read_u16_payload(&mut self.state_conn)
+            .map_err(|e| StateError::sync_other_error(e.to_string()))?;
         let consensus_state: consensus::State = serde_json::from_slice(&json_raw)
             .map_err(|e| StateError::sync_parse_error("vsock".to_string(), e))?;
         Ok(State::from(consensus_state))
@@ -44,7 +44,7 @@ impl PersistStateSync for StateHolder {
         trace!("state local addr: {:?}", self.state_conn.local_addr());
         trace!("state fd: {}", self.state_conn.as_raw_fd());
         let json_raw = serde_json::to_vec(&new_state)
-            .map_err(|e| StateError::sync_parse_error("vsock".to_string(), e))?;
+            .map_err(|e| StateError::serialization_error("vsock".to_string(), e))?;
 
         write_u16_payload(&mut self.state_conn, &json_raw)
             .map_err(|e| StateError::sync_error("vsock".to_string(), e))?;

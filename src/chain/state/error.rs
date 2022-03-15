@@ -51,8 +51,9 @@ define_error! {
             format_args!("Error parse syncing {}", e.path)
         },
         SyncOtherError{
-        } |_| {
-            "Error state syncing"
+            error_message: String,
+        } |e| {
+            format_args!("Error state syncing: {}", e.error_message)
         },
     }
 }

@@ -226,7 +226,7 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                 Err(e) => Err(format!("{:?}", e)),
             };
             keypair.secret.zeroize();
-            let json = serde_json::to_string(&response).map_err(|e| Error::parse_error())?;
+            let json = serde_json::to_string(&response).map_err(Error::serialization_error)?;
             write_u16_payload(&mut stream, json.as_bytes())
                 .map_err(|e| Error::io_error("Failed to send keypair response".to_string(), e))?;
         }

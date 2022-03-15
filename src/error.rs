@@ -28,11 +28,6 @@ define_error! {
             format_args!("chain ID error: {}", e.chain_id)
         },
 
-        ConfigError {
-        } |_| {
-            "Config Error"
-        },
-
         DoubleSign {
         } |_| {
             "Attempted double sign"
@@ -45,45 +40,15 @@ define_error! {
             format_args!("attempted to sign at height {} which is greater than {}", e.request_height, e.max_height)
         },
 
-        CryptoError {
-        } |_| {
-            "cryptographic error"
-        },
-
-        HookError {
-        } |_| {
-            "subcommand hook failed"
-        },
-
         InvalidKeyError {
         } |_| {
             "invalid key"
-        },
-
-        InvalidMessageError {
-        } |_| {
-        "invalid consensus message"
         },
 
         IoError { error: String }
         [ DetailOnly<std::io::Error> ]
         |e| {
             e.error.clone()
-        },
-
-        PanicError {
-        } |_| {
-            "internal crash"
-        },
-
-        ParseError {
-        } |_| {
-            "parse error"
-        },
-
-        PoisonError {
-        } |_| {
-            "internal state poisoned"
         },
 
         ProtocolError { error: String }
@@ -105,18 +70,9 @@ define_error! {
         },
 
         SerializationError {
-        } |_| {
-            "serialization error"
+        }  [ DetailOnly<serde_json::Error> ] |e| {
+            e.clone()
         },
 
-        TendermintError {
-        } |_| {
-            "Tendermint error"
-        },
-
-        VerificationError {
-        } |_| {
-            "verification failed"
-        }
     }
 }

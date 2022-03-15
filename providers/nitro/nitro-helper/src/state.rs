@@ -79,7 +79,6 @@ impl StateSyncer {
     /// load state from the provided vsock stream
     fn sync_from_stream(mut stream: &mut VsockStream) -> Result<consensus::State, Error> {
         let json_raw = read_u16_payload(&mut stream)?;
-        // .map_err(|e| StateError::sync_error("vsock".into(), e))?;
         serde_json::from_slice(&json_raw).map_err(|e| {
             Error::io_error(
                 "parse error".into(),

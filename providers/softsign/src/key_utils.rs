@@ -43,7 +43,7 @@ pub fn load_base64_ed25519_key(path: impl AsRef<Path>) -> Result<ed25519::Keypai
     let key_bytes = load_base64_secret(path)?;
 
     let secret =
-        ed25519::SecretKey::from_bytes(&*key_bytes).map_err(|e| Error::invalid_key_error())?;
+        ed25519::SecretKey::from_bytes(&*key_bytes).map_err(|_e| Error::invalid_key_error())?;
 
     let public = ed25519::PublicKey::from(&secret);
     Ok(ed25519::Keypair { secret, public })

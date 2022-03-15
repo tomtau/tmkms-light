@@ -199,7 +199,7 @@ fn read_msg(conn: &mut impl Read) -> Result<Vec<u8>, Error> {
     let mut buf = vec![0; DATA_MAX_SIZE];
     let buf_read = conn
         .read(&mut buf)
-        .map_err(|e| Error::io_error("read msg failed: {}".into(), e))?;
+        .map_err(|e| Error::io_error("read msg failed".into(), e))?;
     buf.truncate(buf_read);
     Ok(buf)
 }
