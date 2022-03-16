@@ -14,7 +14,7 @@ use std::{future::Future, io, pin::Pin};
 use tendermint::consensus;
 use tendermint_config::net;
 use tmkms_light::config::validator::ValidatorConfig;
-use tmkms_light::error::Error;
+use tmkms_light::error::{io_error_wrap, Error};
 use tmkms_light::utils::read_u16_payload;
 use tracing::{debug, error};
 
@@ -77,13 +77,8 @@ impl TmkmsSgxSigner {
         let (state_from_enclave, state_stream) = UnixStream::pair()
             .map_err(|e| Error::io_error("failed to get state unix socket pair".into(), e))?;
 
-        let (state_syncer, state) =
-            StateSyncer::new(state_path, state_from_enclave).map_err(|e| {
-                Error::io_error(
-                    "failed to get state persistence helper".into(),
-                    std::io::Error::new(std::io::ErrorKind::Other, e),
-                )
-            })?;
+        let (state_syncer, state) = StateSyncer::new(state_path, state_from_enclave)
+            .map_err(|e| io_error_wrap("failed to get state persistence helper".into(), e))?;
         Ok((state_syncer, state, state_stream))
     }
 
@@ -114,13 +109,9 @@ impl TmkmsSgxSigner {
         match enclave_builder.build(&mut device) {
             Ok(enclave) => {
                 let enclave_app_thread = thread::spawn(|| {
-                    enclave.run().map_err(|e| {
-                        Error::io_error(
-                            "enclave runner error".into(),
-                            std::io::Error::new(std::io::ErrorKind::Other, e),
-                        )
-                        .into()
-                    })
+                    enclave
+                        .run()
+                        .map_err(|e| io_error_wrap("enclave runner error".into(), e))
                 });
                 Ok(Self {
                     stream_to_enclave,
@@ -137,10 +128,9 @@ impl TmkmsSgxSigner {
     /// get the response from the enclave via the init stream
     pub fn get_init_response(mut self) -> Result<SgxInitResponse, Error> {
         debug!("waiting for response");
-        let response_bytes = read_u16_payload(&mut self.stream_to_enclave)
-            .map_err(|e| Error::io_error("error reading response".into(), e))?;
+        let response_bytes = read_u16_payload(&mut self.stream_to_enclave)?;
         let resp: SgxInitResponse = serde_json::from_slice(&response_bytes)
-            .map_err(|e| Error::parse_error("error deserializing response", e))?;
+            .map_err(|e| io_error_wrap("error deserializing response".into(), e))?;
         self.join_enclave_thread()?;
         Ok(resp)
     }
@@ -155,9 +145,9 @@ impl TmkmsSgxSigner {
     ) -> Result<Vec<u8>, Error> {
         let sealed_key: SealedKeyData = serde_json::from_slice(
             &fs::read(sealed_key_path)
-                .map_err(|e| Error::io_error("error reading sealed consensus key", e))?,
+                .map_err(|e| Error::io_error("error reading sealed consensus key".into(), e))?,
         )
-        .map_err(|e| Error::io_error("invalid sealed consensus key format", e))?;
+        .map_err(|_e| Error::invalid_key_error())?;
         let secret_connection = match remote_conn {
             Some((
                 net::Address::Tcp {
@@ -169,9 +159,9 @@ impl TmkmsSgxSigner {
             )) => {
                 let sealed_id_key: SealedKeyData = serde_json::from_slice(
                     &fs::read(id_path)
-                        .map_err(|e| Error::io_error("error reading id sealed key", e))?,
+                        .map_err(|e| Error::io_error("error reading id sealed key".into(), e))?,
                 )
-                .map_err(|e| Error::io_error("invalid sealed id key format", e))?;
+                .map_err(|_e| Error::invalid_key_error())?;
                 Some(RemoteConnectionConfig {
                     peer_id,
                     host,
@@ -187,14 +177,14 @@ impl TmkmsSgxSigner {
             secret_connection,
             initial_state,
         })
-        .map_err(|e| Error::io_error("failed to obtain the start request payload", e))?;
+        .map_err(|e| io_error_wrap("failed to obtain the start request payload".into(), e))?;
         Ok(req_bytes)
     }
 
     fn join_enclave_thread(self) -> Result<(), Error> {
         match self.enclave_app_thread.join() {
             Ok(Ok(_)) => Ok(()),
-            Err(e) => Err(Error::io_error("enclave thread error", e).into()),
+            Err(_e) => Err(Error::panic_error()),
             Ok(Err(e)) => Err(e),
         }
     }

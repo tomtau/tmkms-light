@@ -51,6 +51,11 @@ define_error! {
             e.error.clone()
         },
 
+        PanicError {
+        } |_| {
+            "internal crash"
+        },
+
         ProtocolError { error: String }
         [ DetailOnly<std::io::Error> ]
         |e| {
@@ -75,4 +80,8 @@ define_error! {
         },
 
     }
+}
+
+pub fn io_error_wrap<E: Into<Box<dyn std::error::Error + Send + Sync>>>(message: String, error: E) -> Error {
+    Error::io_error(message, std::io::Error::new(std::io::ErrorKind::Other, error))
 }
