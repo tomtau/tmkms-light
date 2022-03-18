@@ -82,6 +82,14 @@ define_error! {
     }
 }
 
-pub fn io_error_wrap<E: Into<Box<dyn std::error::Error + Send + Sync>>>(message: String, error: E) -> Error {
-    Error::io_error(message, std::io::Error::new(std::io::ErrorKind::Other, error))
+/// Wraps IO-related error from a different source into an IO error
+/// as a kind Other
+pub fn io_error_wrap<E: Into<Box<dyn std::error::Error + Send + Sync>>>(
+    message: String,
+    error: E,
+) -> Error {
+    Error::io_error(
+        message,
+        std::io::Error::new(std::io::ErrorKind::Other, error),
+    )
 }

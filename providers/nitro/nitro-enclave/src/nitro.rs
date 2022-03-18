@@ -17,7 +17,7 @@ use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
 use tmkms_light::chain::state::PersistStateSync;
 use tmkms_light::config::validator::ValidatorConfig;
 use tmkms_light::connection::{Connection, PlainConnection};
-use tmkms_light::error::Error;
+use tmkms_light::error::{io_error_wrap, Error};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tmkms_nitro_helper::{
     NitroConfig, NitroKeygenResponse, NitroRequest, NitroResponse, VSOCK_HOST_CID,
@@ -143,13 +143,10 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                 None
             };
             let mut state_holder = state::StateHolder::new(config.enclave_state_port)
-                .map_err(|e| Error::io_error("failed get state connection".to_string(), e))?;
-            let state = state_holder.load_state().map_err(|e| {
-                Error::io_error(
-                    "failed to load initial state".to_string(),
-                    std::io::Error::new(std::io::ErrorKind::Other, e),
-                )
-            })?;
+                .map_err(|e| Error::io_error("failed get state connection".into(), e))?;
+            let state = state_holder
+                .load_state()
+                .map_err(|e| io_error_wrap("failed to load initial state".into(), e))?;
             let conn: Box<dyn Connection> = get_connection(&config, id_keypair.as_ref());
             let mut session = tmkms_light::session::Session::new(
                 ValidatorConfig {
@@ -173,21 +170,11 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
             let mut csprng = OsRng {};
             let mut keypair = Keypair::generate(&mut csprng);
             let public = keypair.public;
-            let pubkeyb64 =
-                String::from_utf8(subtle_encoding::base64::encode(&public)).map_err(|e| {
-                    Error::io_error(
-                        "base64 encoding error".to_string(),
-                        std::io::Error::new(std::io::ErrorKind::Other, e),
-                    )
-                })?;
+            let pubkeyb64 = String::from_utf8(subtle_encoding::base64::encode(&public))
+                .map_err(|e| io_error_wrap("base64 encoding error".into(), e))?;
             let keyidb64 =
                 String::from_utf8(subtle_encoding::base64::encode(&keygen_config.kms_key_id))
-                    .map_err(|e| {
-                        Error::io_error(
-                            "base64 encoding error".to_string(),
-                            std::io::Error::new(std::io::ErrorKind::Other, e),
-                        )
-                    })?;
+                    .map_err(|e| io_error_wrap("base64 encoding error".into(), e))?;
 
             let claim = format!(
                 "{{\"pubkey\":\"{}\",\"key_id\":\"{}\"}}",

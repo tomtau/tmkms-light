@@ -9,7 +9,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 use tmkms_light::chain::state::{consensus, StateError};
-use tmkms_light::error::Error;
+use tmkms_light::error::{io_error_wrap, Error};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tracing::{debug, info, warn};
 use vsock::{SockAddr, VsockListener, VsockStream};
@@ -79,12 +79,7 @@ impl StateSyncer {
     /// load state from the provided vsock stream
     fn sync_from_stream(mut stream: &mut VsockStream) -> Result<consensus::State, Error> {
         let json_raw = read_u16_payload(&mut stream)?;
-        serde_json::from_slice(&json_raw).map_err(|e| {
-            Error::io_error(
-                "parse error".into(),
-                std::io::Error::new(std::io::ErrorKind::Other, e),
-            )
-        })
+        serde_json::from_slice(&json_raw).map_err(|e| io_error_wrap("parse error".into(), e))
     }
 
     /// Launches the state syncer, when get data from stop_recv, the thread will be finished

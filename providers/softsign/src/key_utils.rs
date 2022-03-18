@@ -11,7 +11,7 @@ use ed25519_dalek as ed25519;
 use ed25519_dalek::SECRET_KEY_LENGTH;
 use rand_core::{OsRng, RngCore};
 use subtle_encoding::base64;
-use tmkms_light::error::Error;
+use tmkms_light::error::{io_error_wrap, Error};
 use zeroize::Zeroizing;
 
 /// File permissions for secret data
@@ -29,9 +29,9 @@ pub fn load_base64_secret(path: impl AsRef<Path>) -> Result<Zeroizing<Vec<u8>>, 
 
     // TODO(tarcieri): constant-time string trimming
     let data = Zeroizing::new(base64::decode(base64_data.trim_end()).map_err(|e| {
-        Error::io_error(
+        io_error_wrap(
             format!("can't decode key from `{}`: {}", path.as_ref().display(), e),
-            std::io::Error::new(std::io::ErrorKind::Other, e),
+            e,
         )
     })?);
 
