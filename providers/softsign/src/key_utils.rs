@@ -65,7 +65,6 @@ pub fn write_base64_secret(path: impl AsRef<Path>, data: &[u8]) -> Result<(), Er
                 format!("couldn't write `{}`: {}", path.as_ref().display(), e),
                 e,
             )
-            .into()
         })
 }
 

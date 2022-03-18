@@ -32,7 +32,7 @@ impl StateSyncer {
             Ok(state_json) => {
                 let consensus_state: consensus::State =
                     serde_json::from_str(&state_json).map_err(|e| {
-                        StateError::sync_parse_error(path.as_ref().display().to_string(), e)
+                        StateError::sync_enc_dec_error(path.as_ref().display().to_string(), e)
                     })?;
 
                 Ok(consensus_state)
@@ -48,7 +48,7 @@ impl StateSyncer {
 
         let sockaddr = SockAddr::new_vsock(VSOCK_HOST_CID, vsock_port);
         let vsock_listener = VsockListener::bind(&sockaddr)
-            .map_err(|e| StateError::sync_error("vsock".to_string(), e))?;
+            .map_err(|e| StateError::sync_error("vsock".into(), e))?;
 
         Ok(Self {
             state_file_path,
@@ -72,7 +72,7 @@ impl StateSyncer {
     /// dump the current state to the provided vsock stream
     fn sync_to_stream(&self, stream: &mut VsockStream) -> Result<(), StateError> {
         let json_raw = serde_json::to_vec(&self.state)
-            .map_err(|e| StateError::sync_parse_error("vsock".into(), e))?;
+            .map_err(|e| StateError::sync_enc_dec_error("vsock".into(), e))?;
         write_u16_payload(stream, &json_raw).map_err(|e| StateError::sync_error("vsock".into(), e))
     }
 
@@ -133,7 +133,7 @@ impl StateSyncer {
         );
 
         let json = serde_json::to_string(&new_state)
-            .map_err(|e| StateError::sync_parse_error(path.display().to_string(), e))?;
+            .map_err(|e| StateError::sync_enc_dec_error(path.display().to_string(), e))?;
 
         let state_file_dir = path.parent().unwrap_or_else(|| {
             panic!("state file cannot be root directory");

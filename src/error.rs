@@ -76,7 +76,7 @@ define_error! {
 
         SerializationError {
         }  [ DetailOnly<serde_json::Error> ] |e| {
-            e.clone()
+            format_args!("serialization error: {}", e)
         },
 
     }

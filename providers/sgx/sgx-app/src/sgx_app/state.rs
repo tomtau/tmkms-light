@@ -27,7 +27,7 @@ impl PersistStateSync for StateHolder {
         let json_raw = read_u16_payload(&mut self.state_conn)
             .map_err(|e| StateError::sync_other_error(e.to_string()))?;
         let consensus_state: consensus::State = serde_json::from_slice(&json_raw)
-            .map_err(|e| StateError::sync_parse_error("error parsing state".to_string(), e))?;
+            .map_err(|e| StateError::sync_enc_dec_error("error parsing state".into(), e))?;
         Ok(State::from(consensus_state))
     }
 
@@ -35,10 +35,10 @@ impl PersistStateSync for StateHolder {
         debug!("writing new consensus state to state conn");
 
         let json_raw = serde_json::to_vec(&new_state)
-            .map_err(|e| StateError::sync_parse_error("error serializing state".to_string(), e))?;
+            .map_err(|e| StateError::sync_enc_dec_error("error serializing state".into(), e))?;
 
         write_u16_payload(&mut self.state_conn, &json_raw)
-            .map_err(|e| StateError::sync_error("error state writing to socket".to_string(), e))?;
+            .map_err(|e| StateError::sync_error("error state writing to socket".into(), e))?;
 
         debug!("successfully wrote new consensus state to state connection");
 

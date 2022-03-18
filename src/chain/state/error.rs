@@ -45,10 +45,10 @@ define_error! {
         } [DetailOnly<std::io::Error>] |e| {
             format_args!("Error syncing {}", e.path)
         },
-        SyncParseError{
-            path: String,
+        SyncEncDecError{
+            path_or_msg: String,
         } [DetailOnly<serde_json::Error>] |e| {
-            format_args!("Error parse syncing {}", e.path)
+            format_args!("Error parsing or serializing in syncing {}", e.path_or_msg)
         },
         SyncOtherError{
             error_message: String,

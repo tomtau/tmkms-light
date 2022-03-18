@@ -101,7 +101,7 @@ impl<S: PersistStateSync> Session<S> {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
                                 Error::signing_tendermint_error(
                                     "can't get proposal signable bytes".into(),
-                                    e.into(),
+                                    e,
                                 )
                             })?;
                             let started_at = Instant::now();
@@ -156,7 +156,7 @@ impl<S: PersistStateSync> Session<S> {
                             let signable_bytes = req.to_signable_vec().map_err(|e| {
                                 Error::signing_tendermint_error(
                                     "cannot get vote signable bytes".into(),
-                                    e.into(),
+                                    e,
                                 )
                             })?;
                             let started_at = Instant::now();

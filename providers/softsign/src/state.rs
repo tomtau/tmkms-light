@@ -37,7 +37,10 @@ impl PersistStateSync for StateHolder {
             Ok(state_json) => {
                 let consensus_state: consensus::State =
                     serde_json::from_str(&state_json).map_err(|e| {
-                        StateError::sync_parse_error(self.state_file_path.display().to_string(), e)
+                        StateError::sync_enc_dec_error(
+                            self.state_file_path.display().to_string(),
+                            e,
+                        )
                     })?;
 
                 Ok(State::from(consensus_state))
@@ -58,7 +61,7 @@ impl PersistStateSync for StateHolder {
         );
 
         let json = serde_json::to_string(&new_state).map_err(|e| {
-            StateError::sync_parse_error(self.state_file_path.display().to_string(), e)
+            StateError::sync_enc_dec_error(self.state_file_path.display().to_string(), e)
         })?;
 
         let state_file_dir = self.state_file_path.parent().unwrap_or_else(|| {

@@ -24,7 +24,7 @@ impl StateSyncer {
         let state = match fs::read_to_string(&path) {
             Ok(state_json) => {
                 let consensus_state: consensus::State = serde_json::from_str(&state_json)
-                    .map_err(|e| StateError::sync_parse_error("error parsing".into(), e))?;
+                    .map_err(|e| StateError::sync_enc_dec_error("error parsing".into(), e))?;
 
                 Ok(consensus_state)
             }
@@ -51,7 +51,7 @@ impl StateSyncer {
             .map_err(|e| StateError::sync_other_error(e.to_string()))?;
 
         serde_json::from_slice(&json_raw)
-            .map_err(|e| StateError::sync_parse_error("failed to deserialize state".into(), e))
+            .map_err(|e| StateError::sync_enc_dec_error("failed to deserialize state".into(), e))
     }
 
     /// Write the initial state to the given path on disk
@@ -85,7 +85,7 @@ impl StateSyncer {
         );
 
         let json = serde_json::to_string(&new_state)
-            .map_err(|e| StateError::sync_parse_error(path.display().to_string(), e))?;
+            .map_err(|e| StateError::sync_enc_dec_error(path.display().to_string(), e))?;
 
         let state_file_dir = path.parent().unwrap_or_else(|| {
             panic!("state file cannot be root directory");
