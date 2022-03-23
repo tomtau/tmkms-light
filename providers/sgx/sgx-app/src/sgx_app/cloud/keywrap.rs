@@ -1,9 +1,10 @@
+use aes::cipher::{BlockDecrypt, KeyInit};
 use aes::{
     cipher::generic_array::{
         typenum::{U32, U40},
         GenericArray,
     },
-    Aes256, BlockDecrypt, NewBlockCipher,
+    Aes256,
 };
 use std::convert::TryInto;
 use subtle::ConstantTimeEq;
