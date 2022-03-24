@@ -176,6 +176,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d36b44c56da495a06bafa838f418023ac6b3d81fdb21ee5b7cd23f9182197b35"
 
 [[package]]
+name = "aws-nitro-enclaves-nsm-api"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9138ac237191fcb830a6c5fb45b93573ee670956bef2b2dd1ee8609daa59a4a"
+dependencies = [
+ "libc",
+ "log",
+ "nix 0.20.0",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+]
+
+[[package]]
 name = "backtrace"
 version = "0.3.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1469,29 +1483,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nsm-driver"
-version = "0.1.0"
-source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api?rev=9ddb589875baf345d085a980aa96cf3a4e480ea8#9ddb589875baf345d085a980aa96cf3a4e480ea8"
-dependencies = [
- "libc",
- "log",
- "nix 0.20.0",
- "nsm-io",
- "serde_cbor",
-]
-
-[[package]]
-name = "nsm-io"
-version = "0.1.0"
-source = "git+https://github.com/aws/aws-nitro-enclaves-nsm-api?rev=9ddb589875baf345d085a980aa96cf3a4e480ea8#9ddb589875baf345d085a980aa96cf3a4e480ea8"
-dependencies = [
- "log",
- "serde",
- "serde_bytes",
- "serde_cbor",
-]
-
-[[package]]
 name = "ntapi"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2673,10 +2664,9 @@ version = "0.3.0"
 dependencies = [
  "anomaly",
  "aws-ne-sys",
+ "aws-nitro-enclaves-nsm-api",
  "ed25519-dalek",
  "nix 0.23.1",
- "nsm-driver",
- "nsm-io",
  "rand_core 0.6.3",
  "serde_bytes",
  "serde_json",

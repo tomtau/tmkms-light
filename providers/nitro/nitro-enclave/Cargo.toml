@@ -1,17 +1,16 @@
 [package]
 name = "tmkms-nitro-enclave"
 version = "0.3.0"
-authors = [ "Tomas Tauber <2410580+tomtau@users.noreply.github.com>" ]
+authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>"]
 edition = "2021"
 
 [dependencies]
 anomaly = "0.2"
 aws-ne-sys = "0.4"
+aws-nitro-enclaves-nsm-api = "0.2"
 ed25519-dalek = "1"
 nix = "0.23"
-nsm-io = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api", rev="9ddb589875baf345d085a980aa96cf3a4e480ea8" }
-nsm-driver = { git = "https://github.com/aws/aws-nitro-enclaves-nsm-api", rev="9ddb589875baf345d085a980aa96cf3a4e480ea8" }
-rand_core = { version = "0.6", default-features = false, features = ["getrandom"]}
+rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 serde_bytes = "0.11"
 serde_json = "1"
 subtle = "2"

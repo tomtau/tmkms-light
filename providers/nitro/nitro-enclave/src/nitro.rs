@@ -2,10 +2,10 @@
 mod state;
 
 use anomaly::format_err;
+use aws_nitro_enclaves_nsm_api::api::{Request, Response};
+use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init, nsm_process_request};
 use ed25519_dalek as ed25519;
 use ed25519_dalek::Keypair;
-use nsm_driver::{nsm_exit, nsm_init, nsm_process_request};
-use nsm_io::{Request, Response};
 use rand_core::OsRng;
 use serde_bytes::ByteBuf;
 use std::io;
