@@ -4,13 +4,13 @@ use crate::shared::{NitroKeygenConfig, NitroKeygenResponse, NitroRequest, NitroR
 use ed25519_dalek::PublicKey;
 use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
-use tokio::runtime::Builder;
 use vsock::SockAddr;
 
 pub(crate) mod credential {
     use crate::shared::AwsCredentials;
     use aws_config::imds::credentials;
     use aws_types::credentials::ProvideCredentials;
+    use tokio::runtime::Builder;
 
     /// get credentials from Aws Instance Metadata Service Version 2
     /// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
