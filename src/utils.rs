@@ -1,9 +1,8 @@
-use anomaly::format_err;
 use std::io::{self, Read, Write};
 use std::str::FromStr;
 use tracing::{debug, trace};
 
-use crate::error::{Error, ErrorKind::IoError};
+use crate::error::Error;
 
 /// Options for displaying public key
 #[derive(Debug)]
@@ -56,7 +55,7 @@ pub fn read_u16_payload<S: Read>(stream: &mut S) -> Result<Vec<u8>, Error> {
     let mut len_b = [0u8; 2];
     stream
         .read_exact(&mut len_b)
-        .map_err(|e| format_err!(IoError, "error reading len: {}", e))?;
+        .map_err(|e| Error::io_error("Error reading length".to_owned(), e))?;
 
     let l = (u16::from_le_bytes(len_b)) as usize;
     if l > 0 {
@@ -71,7 +70,10 @@ pub fn read_u16_payload<S: Read>(stream: &mut S) -> Result<Vec<u8>, Error> {
         }
 
         if total == 0 {
-            return Err(IoError.into());
+            return Err(Error::io_error(
+                "Zero length".to_owned(),
+                std::io::Error::from(std::io::ErrorKind::UnexpectedEof),
+            ));
         }
         state_raw.resize(total, 0);
         Ok(state_raw)

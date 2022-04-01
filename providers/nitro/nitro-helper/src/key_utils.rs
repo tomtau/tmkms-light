@@ -10,12 +10,14 @@ pub(crate) mod credential {
     use crate::shared::AwsCredentials;
     use aws_config::imds::credentials;
     use aws_types::credentials::ProvideCredentials;
+    use tokio::runtime::Builder;
 
     /// get credentials from Aws Instance Metadata Service Version 2
     /// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
     pub fn get_credentials() -> Result<AwsCredentials, String> {
         let client = credentials::ImdsCredentialsProvider::builder().build();
-        let rt = tokio::runtime::Runtime::new()
+        let rt = Builder::new_current_thread()
+            .build()
             .map_err(|e| format!("failed to create tokio runtime: {:?}", e))?;
         let aws_credential = rt
             .block_on(client.provide_credentials())

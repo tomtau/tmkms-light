@@ -20,8 +20,7 @@ The code is based on the [tmkms](https://github.com/iqlusioninc/tmkms) repositor
 
 ## Status
 
-Tendermint KMS Light is still in development (e.g. the SGX signing provider has not
-yet been signed, so that it could be launched in the production mode).
+Tendermint KMS Light is currently *beta quality*.
 In the future, the work developed in this repository may be upstreamed 
 to the original [tmkms](https://github.com/iqlusioninc/tmkms) repository.
 

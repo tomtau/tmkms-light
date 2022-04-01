@@ -1,7 +1,6 @@
 /// state persistence helper;
 mod state;
 
-use anomaly::format_err;
 use aws_nitro_enclaves_nsm_api::api::{Request, Response};
 use aws_nitro_enclaves_nsm_api::driver::{nsm_exit, nsm_init, nsm_process_request};
 use ed25519_dalek as ed25519;
@@ -18,10 +17,7 @@ use tendermint_p2p::secret_connection::{self, PublicKey, SecretConnection};
 use tmkms_light::chain::state::PersistStateSync;
 use tmkms_light::config::validator::ValidatorConfig;
 use tmkms_light::connection::{Connection, PlainConnection};
-use tmkms_light::error::{
-    Error,
-    ErrorKind::{AccessError, InvalidKey, IoError, ParseError},
-};
+use tmkms_light::error::{io_error_wrap, Error};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tmkms_nitro_helper::{
     NitroConfig, NitroKeygenResponse, NitroRequest, NitroResponse, VSOCK_HOST_CID,
@@ -106,8 +102,7 @@ pub fn get_connection(
 /// a simple req-rep handling loop
 pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
     let nsm_fd = nsm_init();
-    let json_raw = read_u16_payload(&mut stream)
-        .map_err(|_e| format_err!(IoError, "failed to read config"))?;
+    let json_raw = read_u16_payload(&mut stream)?;
     let request: Result<NitroRequest, _> = serde_json::from_slice(&json_raw);
     match request {
         Ok(NitroRequest::Start(config)) => {
@@ -119,10 +114,10 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                     config.credentials.aws_session_token.as_bytes(),
                     config.sealed_consensus_key.as_ref(),
                 )
-                .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
+                .map_err(|_e| Error::access_error())?,
             );
             let secret = ed25519::SecretKey::from_bytes(&*key_bytes)
-                .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
+                .map_err(|_e| Error::invalid_key_error())?;
             let public = ed25519::PublicKey::from(&secret);
             let keypair = ed25519::Keypair { secret, public };
             let id_keypair = if let Some(ref ciphertext) = config.sealed_id_key {
@@ -134,10 +129,10 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                         config.credentials.aws_session_token.as_bytes(),
                         ciphertext.as_ref(),
                     )
-                    .map_err(|_e| format_err!(AccessError, "failed to decrypt key"))?,
+                    .map_err(|_e| Error::access_error())?,
                 );
                 let id_secret = ed25519::SecretKey::from_bytes(&*id_key_bytes)
-                    .map_err(|e| format_err!(InvalidKey, "invalid Ed25519 key: {}", e))?;
+                    .map_err(|_e| Error::invalid_key_error())?;
                 let id_public = ed25519::PublicKey::from(&id_secret);
                 let id_keypair = ed25519::Keypair {
                     secret: id_secret,
@@ -148,10 +143,10 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                 None
             };
             let mut state_holder = state::StateHolder::new(config.enclave_state_port)
-                .map_err(|_e| format_err!(IoError, "failed get state connection"))?;
+                .map_err(|e| Error::io_error("failed get state connection".into(), e))?;
             let state = state_holder
                 .load_state()
-                .map_err(|_e| format_err!(IoError, "failed to load initial state"))?;
+                .map_err(|e| io_error_wrap("failed to load initial state".into(), e))?;
             let conn: Box<dyn Connection> = get_connection(&config, id_keypair.as_ref());
             let mut session = tmkms_light::session::Session::new(
                 ValidatorConfig {
@@ -176,10 +171,10 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
             let mut keypair = Keypair::generate(&mut csprng);
             let public = keypair.public;
             let pubkeyb64 = String::from_utf8(subtle_encoding::base64::encode(&public))
-                .map_err(|e| format_err!(IoError, "base64 encoding error: {:?}", e))?;
+                .map_err(|e| io_error_wrap("base64 encoding error".into(), e))?;
             let keyidb64 =
                 String::from_utf8(subtle_encoding::base64::encode(&keygen_config.kms_key_id))
-                    .map_err(|e| format_err!(IoError, "base64 encoding error: {:?}", e))?;
+                    .map_err(|e| io_error_wrap("base64 encoding error".into(), e))?;
 
             let claim = format!(
                 "{{\"pubkey\":\"{}\",\"key_id\":\"{}\"}}",
@@ -218,10 +213,9 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                 Err(e) => Err(format!("{:?}", e)),
             };
             keypair.secret.zeroize();
-            let json = serde_json::to_string(&response)
-                .map_err(|e| format_err!(ParseError, "serde keygen response error: {:?}", e))?;
+            let json = serde_json::to_string(&response).map_err(Error::serialization_error)?;
             write_u16_payload(&mut stream, json.as_bytes())
-                .map_err(|_e| format_err!(IoError, "failed to send keypair response"))?;
+                .map_err(|e| Error::io_error("failed to send keypair response".into(), e))?;
         }
         Err(e) => {
             error!("config error: {}", e);
