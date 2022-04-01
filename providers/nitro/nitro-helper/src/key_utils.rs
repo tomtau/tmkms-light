@@ -4,6 +4,7 @@ use crate::shared::{NitroKeygenConfig, NitroKeygenResponse, NitroRequest, NitroR
 use ed25519_dalek::PublicKey;
 use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
+use tokio::runtime::Builder;
 use vsock::SockAddr;
 
 pub(crate) mod credential {
@@ -15,7 +16,8 @@ pub(crate) mod credential {
     /// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
     pub fn get_credentials() -> Result<AwsCredentials, String> {
         let client = credentials::ImdsCredentialsProvider::builder().build();
-        let rt = tokio::runtime::Runtime::new()
+        let rt = Builder::new_current_thread()
+            .build()
             .map_err(|e| format!("failed to create tokio runtime: {:?}", e))?;
         let aws_credential = rt
             .block_on(client.provide_credentials())
