@@ -6,95 +6,27 @@ use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use vsock::SockAddr;
 
-// TODO: use aws-rust-sdk after the issue fixed
-// https://github.com/awslabs/aws-sdk-rust/issues/97
 pub(crate) mod credential {
     use crate::shared::AwsCredentials;
-    use reqwest::blocking::Client;
-    use reqwest::header::{HeaderName, HeaderValue};
-    use secrecy::{ExposeSecret, SecretString};
-    use serde::Deserialize;
-    use std::str::FromStr;
-
-    const AWS_CREDENTIALS_PROVIDER_IP: &str = "169.254.169.254";
-    const AWS_CREDENTIALS_PROVIDER_PATH: &str = "latest/meta-data/iam/security-credentials";
-    const AWS_TOKEN_PATH: &str = "latest/api/token";
-
-    #[derive(Clone, Debug, Deserialize)]
-    pub struct AwsCredentialsResponse {
-        #[serde(alias = "AccessKeyId")]
-        aws_key_id: SecretString,
-        #[serde(alias = "SecretAccessKey")]
-        aws_secret_key: SecretString,
-        #[serde(default, alias = "Token")]
-        aws_session_token: Option<SecretString>,
-    }
-
-    impl From<AwsCredentialsResponse> for AwsCredentials {
-        fn from(r: AwsCredentialsResponse) -> AwsCredentials {
-            AwsCredentials {
-                aws_key_id: r.aws_key_id.expose_secret().into(),
-                aws_secret_key: r.aws_secret_key.expose_secret().into(),
-                // note: the token should not be none so that unwrap can be used
-                aws_session_token: r.aws_session_token.unwrap().expose_secret().into(),
-            }
-        }
-    }
+    use aws_config::imds::credentials;
+    use aws_types::credentials::ProvideCredentials;
 
     /// get credentials from Aws Instance Metadata Service Version 2
     /// https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
     pub fn get_credentials() -> Result<AwsCredentials, String> {
-        let token_address = format!("http://{}/{}/", AWS_CREDENTIALS_PROVIDER_IP, AWS_TOKEN_PATH);
-        let client = Client::new();
-        let header_key = HeaderName::from_str("X-aws-ec2-metadata-token-ttl-seconds").unwrap();
-        let header_value = HeaderValue::from_str("30").unwrap();
-        let token_response = client
-            .put(token_address)
-            .header(header_key, header_value)
-            .send()
-            .map_err(|e| format!("get aws token error: {:?}", e))?;
-
-        let token = if token_response.status().is_success() {
-            token_response
-                .text()
-                .map_err(|e| format!("can't get token: {:?}", e))?
-        } else {
-            return Err(format!(
-                "get aws sdk token failed, error code: {}",
-                token_response.status()
-            ));
+        let client = credentials::ImdsCredentialsProvider::builder().build();
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| format!("failed to create tokio runtime: {:?}", e))?;
+        let aws_credential = rt
+            .block_on(client.provide_credentials())
+            .map_err(|e| format!("invalid credential: {:?}", e))?;
+        let credentials = AwsCredentials {
+            aws_key_id: aws_credential.access_key_id().into(),
+            aws_secret_key: aws_credential.secret_access_key().into(),
+            aws_session_token: aws_credential.session_token().unwrap().into(),
         };
 
-        let header_token_name = HeaderName::from_str("X-aws-ec2-metadata-token").unwrap();
-        let header_token_value =
-            HeaderValue::from_str(&token).map_err(|_| "invalid token".to_string())?;
-
-        let role_name_address = format!(
-            "http://{}/{}/",
-            AWS_CREDENTIALS_PROVIDER_IP, AWS_CREDENTIALS_PROVIDER_PATH
-        );
-        let role_name = client
-            .get(role_name_address)
-            .header(header_token_name.clone(), header_token_value.clone())
-            .send()
-            .map_err(|e| format!("get role name error: {:?}", e))?
-            .text()
-            .map_err(|e| format!("get role name result failed: {:?}", e))?;
-        let credentials_provider_url = format!(
-            "http://{}/{}/{}",
-            AWS_CREDENTIALS_PROVIDER_IP, AWS_CREDENTIALS_PROVIDER_PATH, role_name
-        );
-        let credentials: AwsCredentialsResponse = client
-            .get(credentials_provider_url)
-            .header(header_token_name, header_token_value)
-            .send()
-            .map_err(|e| format!("get credentials error: {:?}", e))?
-            .json()
-            .map_err(|e| format!("get credentials result failed: {:?}", e))?;
-        if credentials.aws_session_token.is_none() {
-            return Err("aws session is empty in credentials".to_string());
-        }
-        Ok(credentials.into())
+        Ok(credentials)
     }
 }
 
