@@ -9,7 +9,6 @@ default = ["main"]
 main = ["sysinfo", "reqwest"]
 
 [dependencies]
-bytes = "= 0.5"
 ctrlc = "3"
 chrono = "0.4"
 ed25519 = { version = "1", features = [ "serde" ] }
