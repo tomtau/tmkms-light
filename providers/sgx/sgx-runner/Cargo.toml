@@ -11,7 +11,6 @@ ed25519 = { version = "1", features = ["serde"] }
 ed25519-dalek =  { version = "1", features = ["serde"] }
 rsa = { version = "0.5", features = ["serde", "alloc"] }
 sgx-isa = { version = "0.3", features = ["serde"] }
-thiserror = "1"
 tendermint = "0.23"
 tendermint-config = "0.23"
 tmkms-light = { path = "../../.." }
