@@ -17,6 +17,7 @@ pub(crate) mod credential {
     pub fn get_credentials() -> Result<AwsCredentials, String> {
         let client = credentials::ImdsCredentialsProvider::builder().build();
         let rt = Builder::new_current_thread()
+            .enable_all()
             .build()
             .map_err(|e| format!("failed to create tokio runtime: {:?}", e))?;
         let aws_credential = rt
