@@ -1764,7 +1764,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "444879275cb4fd84958b1a1d5420d15e6fcf7c235fe47f053c9c2a80aceb6001"
 dependencies = [
  "bytes 1.0.1",
- "prost-derive",
+ "prost-derive 0.9.0",
+]
+
+[[package]]
+name = "prost"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a07b0857a71a8cb765763950499cae2413c3f9cede1133478c43600d9e146890"
+dependencies = [
+ "bytes 1.0.1",
+ "prost-derive 0.10.1",
 ]
 
 [[package]]
@@ -1781,13 +1791,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost-types"
-version = "0.9.0"
+name = "prost-derive"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "534b7a0e836e3c482d2693070f982e39e7611da9695d4d1f5a4b186b51faef0a"
+checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "proc-macro2 1.0.28",
+ "quote 1.0.9",
+ "syn 1.0.74",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.0.1",
- "prost",
+ "prost 0.10.1",
 ]
 
 [[package]]
@@ -2402,9 +2425,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint"
-version = "0.23.5"
+version = "0.23.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df8150cb636f400ead6de6f4893824d40ecf71214c5d9f8a1d445b5f38fff7b3"
+checksum = "3ca881fa4dedd2b46334f13be7fbc8cc1549ba4be5a833fe4e73d1a1baaf7949"
 dependencies = [
  "async-trait",
  "bytes 1.0.1",
@@ -2414,7 +2437,7 @@ dependencies = [
  "futures 0.3.16",
  "num-traits",
  "once_cell",
- "prost",
+ "prost 0.10.1",
  "prost-types",
  "serde",
  "serde_bytes",
@@ -2431,9 +2454,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-config"
-version = "0.23.5"
+version = "0.23.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5a5c41141b56f1e0463182d910b8ccb84fd4abe61a4290a89794d44ad3e15a9"
+checksum = "f6c56ee93f4e9b7e7daba86d171f44572e91b741084384d0ae00df7991873dfd"
 dependencies = [
  "flex-error",
  "serde",
@@ -2457,7 +2480,7 @@ dependencies = [
  "flume",
  "hkdf",
  "merlin",
- "prost",
+ "prost 0.9.0",
  "rand_core 0.5.1",
  "sha2",
  "signature",
@@ -2471,15 +2494,15 @@ dependencies = [
 
 [[package]]
 name = "tendermint-proto"
-version = "0.23.5"
+version = "0.23.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10ba5f19afd52d69aa139cbf2a2ad129673a87aebeb66742b852a4d91b482e7b"
+checksum = "b71f925d74903f4abbdc4af0110635a307b3cb05b175fdff4a7247c14a4d0874"
 dependencies = [
  "bytes 1.0.1",
  "flex-error",
  "num-derive 0.3.3",
  "num-traits",
- "prost",
+ "prost 0.10.1",
  "prost-types",
  "serde",
  "serde_bytes",
@@ -2578,7 +2601,7 @@ version = "0.3.0"
 dependencies = [
  "anomaly",
  "ed25519-dalek",
- "prost",
+ "prost 0.9.0",
  "serde",
  "subtle-encoding",
  "tendermint",
