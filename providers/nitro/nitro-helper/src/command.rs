@@ -9,6 +9,7 @@ use tmkms_light::utils::write_u16_payload;
 use tmkms_light::utils::{print_pubkey, PubkeyDisplay};
 use vsock::SockAddr;
 
+use crate::command::nitro_enclave::describe_enclave;
 use crate::config::{EnclaveConfig, EnclaveOpt, NitroSignOpt, VSockProxyOpt};
 use crate::key_utils::{credential, generate_key};
 use crate::proxy::Proxy;
@@ -76,6 +77,18 @@ pub fn init(
             .ok_or_else(|| "cannot create a dir in a root directory".to_owned())?,
     )
     .map_err(|e| format!("failed to create dirs for state storage: {:?}", e))?;
+
+    // check if enclave and vsock proxy is running
+    if !describe_enclave()?
+        .into_iter()
+        .any(|x| x.enclave_cid == cid as u64)
+    {
+        return Err("can't find running enclave with matched cid. Please use tmkms-nitro-helper run command".to_owned());
+    }
+    if !check_vsock_proxy() {
+        return Err("vsock proxy is not running, Please run vsock-proxy 8000 kms.{{ kms_region }}.amazonaws.com 443 &".to_owned());
+    }
+
     let (pubkey, attestation_doc) = generate_key(
         cid,
         port,
