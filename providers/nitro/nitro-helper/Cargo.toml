@@ -11,7 +11,7 @@ ctrlc = "3"
 chrono = "0.4"
 ed25519-dalek = "1"
 flex-error = "0.4"
-nix = "0.23"
+nix = "0.24"
 serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 structopt = "0.3"
