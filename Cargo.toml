@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 ed25519-dalek = "1"
 flex-error = "0.4"
-prost = "0.9"
+prost = "0.10"
 serde = { version = "1", features = ["serde_derive"] }
 serde_json = "1"
 subtle-encoding = { version = "0.5", features = ["bech32-preview"] }
