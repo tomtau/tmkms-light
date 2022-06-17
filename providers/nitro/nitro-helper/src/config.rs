@@ -148,7 +148,8 @@ impl EnclaveConfig {
         if !config_path.exists() {
             return Err("config path is not exists".to_string());
         }
-        let toml_string = fs::read_to_string(config_path).expect("toml config file read");
+        let toml_string = fs::read_to_string(config_path)
+            .map_err(|e| format!("toml config file failed to read: {:?}", e))?;
         toml::from_str(&toml_string)
             .map_err(|e| format!("toml config file failed to parse: {:?}", e))
     }
