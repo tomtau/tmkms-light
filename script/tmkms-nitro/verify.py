@@ -1,16 +1,17 @@
 # bech32 Copyright (c) 2017, Pieter Wuille (licensed under the MIT License)
 # attestation verifier Copyright (c) 2020, Richard Fan (licensed under the Apache License, Version 2.0)
 # Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
-import cbor2
 import base64
 import json
-from cose.keys.ec2 import EC2
+import sys
+from datetime import datetime
+
+import cbor2
 from cose.keys.curves import P384
+from cose.keys.ec2 import EC2
 from cose.messages import Sign1Message
 from Crypto.Util.number import long_to_bytes
 from OpenSSL import crypto
-from datetime import datetime
-import sys
 
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
@@ -179,6 +180,11 @@ def verify_attestation_doc(attestation_doc, root_cert_pem = None, bech32hrp = "c
         for _cert_binary in doc_obj['cabundle'][1:]:
             _cert = crypto.load_certificate(crypto.FILETYPE_ASN1, _cert_binary)
             store.add_cert(_cert)
+
+        # add 10 seconds buffer to the current time if the cert expires
+        if cert.has_expired():
+            print(f"Certificate has expired at {cert.get_notAfter().decode('UTF-8')}, adding 10 seconds buffer for verification")
+            cert.gmtime_adj_notAfter(10)
 
         # Get the X509Store context
         store_ctx = crypto.X509StoreContext(store, cert)
