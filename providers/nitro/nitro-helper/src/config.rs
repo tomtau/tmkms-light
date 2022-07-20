@@ -93,12 +93,6 @@ pub struct EnclaveOpt {
     /// Set the enclave log server port
     #[structopt(long, default_value = "6050")]
     pub log_server_port: u32,
-    /// Set the enclave log file
-    #[structopt(long)]
-    pub log_file: Option<PathBuf>,
-    /// output the enclave to console
-    #[structopt(long, short = "l")]
-    pub log_to_console: bool,
 }
 
 impl Default for EnclaveOpt {
@@ -109,8 +103,6 @@ impl Default for EnclaveOpt {
             memory_mib: 512,
             cpu_count: 2,
             log_server_port: 6050,
-            log_file: None,
-            log_to_console: true,
         }
     }
 }

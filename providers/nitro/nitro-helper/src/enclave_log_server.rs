@@ -1,8 +1,5 @@
 use crate::shared::VSOCK_HOST_CID;
-use chrono::offset::Local;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::io::Read;
 use std::thread;
 use std::time::Duration;
 use tmkms_nitro_helper::tracing_layer::Log;
@@ -14,32 +11,13 @@ use vsock::{SockAddr, VsockListener};
 pub struct LogServer {
     cid: u32,
     local_port: u32,
-    // put log to console or not
-    to_console: bool,
-    // put log to file
-    log_file: Option<File>,
 }
 
 impl LogServer {
-    pub fn new(
-        local_port: u32,
-        to_console: bool,
-        log_file: Option<PathBuf>,
-    ) -> std::io::Result<Self> {
-        let file = if let Some(log_file) = log_file {
-            let f = OpenOptions::new()
-                .write(true)
-                .append(true)
-                .open(&log_file)?;
-            Some(f)
-        } else {
-            None
-        };
+    pub fn new(local_port: u32) -> std::io::Result<Self> {
         Ok(Self {
             cid: VSOCK_HOST_CID,
             local_port,
-            to_console,
-            log_file: file,
         })
     }
 
@@ -95,23 +73,13 @@ impl LogServer {
 
     fn process_log(&mut self, raw_log: &[u8]) -> Result<(), String> {
         let log = Log::from_raw(raw_log).map_err(|e| format!("{:?}", e))?;
-        let mut s = log.format();
-        if self.to_console {
-            match log.level {
-                Level::TRACE => trace!("{}", s),
-                Level::DEBUG => debug!("{}", s),
-                Level::INFO => info!("{}", s),
-                Level::WARN => warn!("{}", s),
-                Level::ERROR => error!("{}", s),
-            }
-        }
-
-        if let Some(file) = self.log_file.as_mut() {
-            let now = Local::now();
-            s = format!("{} {:<6}{}\n", now.format("%F %T%.3f"), log.level, s);
-            file.write_all(s.as_bytes())
-                .map_err(|e| format!("write log to file error: {:?}", e))?;
-            let _ = file.flush();
+        let s = log.format();
+        match log.level {
+            Level::TRACE => trace!("{}", s),
+            Level::DEBUG => debug!("{}", s),
+            Level::INFO => info!("{}", s),
+            Level::WARN => warn!("{}", s),
+            Level::ERROR => error!("{}", s),
         }
         Ok(())
     }

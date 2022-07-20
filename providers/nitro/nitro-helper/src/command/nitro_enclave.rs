@@ -119,12 +119,7 @@ pub fn run_enclave(opt: &EnclaveOpt, stop_receiver: Receiver<()>) -> Result<(), 
     }
     // lauch enclave server
     tracing::info!("start enclave log server at port {}", opt.log_server_port);
-    let enclave_log_server = LogServer::new(
-        opt.log_server_port,
-        opt.log_to_console,
-        opt.log_file.clone(),
-    )
-    .map_err(|e| format!("{:?}", e))?;
+    let enclave_log_server = LogServer::new(opt.log_server_port).map_err(|e| format!("{:?}", e))?;
 
     enclave_log_server.launch();
     // run enclave
