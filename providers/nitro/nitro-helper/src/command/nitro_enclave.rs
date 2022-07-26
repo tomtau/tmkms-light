@@ -1,5 +1,5 @@
 // Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
+// Modifications Copyright (c) 2021-present, Crypto.com (licensed under the Apache License, Version 2.0)
 
 use crate::command::check_vsock_proxy;
 use crate::config::{EnclaveOpt, VSockProxyOpt};
