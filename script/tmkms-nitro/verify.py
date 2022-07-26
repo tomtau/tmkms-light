@@ -1,6 +1,6 @@
 # bech32 Copyright (c) 2017, Pieter Wuille (licensed under the MIT License)
 # attestation verifier Copyright (c) 2020, Richard Fan (licensed under the Apache License, Version 2.0)
-# Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
+# Modifications Copyright (c) 2021-present Crypto.com (licensed under the Apache License, Version 2.0)
 import base64
 import json
 import sys

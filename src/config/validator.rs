@@ -1,6 +1,6 @@
 //! Validator configuration
 //! Copyright (c) 2018-2021 Iqlusion Inc. (licensed under the Apache License, Version 2.0)
-//! Modifications Copyright (c) 2021, Foris Limited (licensed under the Apache License, Version 2.0)
+//! Modifications Copyright (c) 2021-present Crypto.com (licensed under the Apache License, Version 2.0)
 
 use serde::{Deserialize, Serialize};
 use tendermint::chain;
