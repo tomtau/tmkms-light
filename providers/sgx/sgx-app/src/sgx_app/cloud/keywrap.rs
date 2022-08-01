@@ -33,8 +33,8 @@ fn aes256_unwrap_key_and_iv(
             let b_i = i * 8;
             ciphertext[..8].copy_from_slice(&(a ^ t).to_be_bytes());
             ciphertext[8..].copy_from_slice(&r[b_i..][0..8]);
-            let mut block = GenericArray::from_mut_slice(&mut ciphertext);
-            cipher.decrypt_block(&mut block);
+            let block = GenericArray::from_mut_slice(&mut ciphertext);
+            cipher.decrypt_block(block);
             // SAFETY: static allocation above
             a = u64::from_be_bytes(ciphertext[..8].try_into().unwrap());
             r[b_i..][0..8].copy_from_slice(&ciphertext[8..]);
@@ -130,12 +130,33 @@ mod tests {
         );
     }
 
-    #[quickcheck]
-    fn wrap_unwrap(kek: KeyWrap, key: KeyWrap) -> bool {
-        let wrapped =
-            aes_keywrap_rs::Aes256Kw::aes_wrap_key_with_pad(&kek.0, &key.0).expect("wrap key");
-        let unwrap = aes256_unwrap_key_with_pad(&kek.0, &wrapped).expect("unwrap");
-        let uref: &[u8] = unwrap.as_ref();
-        uref == &key.0
+    #[test]
+    fn test_padded_256bit_kek_and_256bit_key() {
+        let kek = subtle_encoding::hex::decode_upper(
+            "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F",
+        )
+        .unwrap();
+        let cipher = subtle_encoding::hex::decode_upper(
+            "4A8029243027353B0694CF1BD8FC745BB0CE8A739B19B1960B12426D4C39CFEDA926D103AB34E9F6",
+        )
+        .unwrap();
+        let plain = subtle_encoding::hex::decode_upper(
+            "00112233445566778899AABBCCDDEEFF000102030405060708090A0B0C0D0E0F",
+        )
+        .unwrap();
+        // assert_eq!(cipher, aes_wrap_key(&kek, &plain).unwrap());
+        assert_eq!(
+            plain,
+            aes256_unwrap_key_with_pad(&kek, &cipher).unwrap().to_vec()
+        );
     }
+
+    // #[quickcheck]
+    // fn wrap_unwrap(kek: KeyWrap, key: KeyWrap) -> bool {
+    //     let wrapped =
+    //         aes_keywrap_rs::Aes256Kw::aes_wrap_key_with_pad(&kek.0, &key.0).expect("wrap key");
+    //     let unwrap = aes256_unwrap_key_with_pad(&kek.0, &wrapped).expect("unwrap");
+    //     let uref: &[u8] = unwrap.as_ref();
+    //     uref == &key.0
+    // }
 }

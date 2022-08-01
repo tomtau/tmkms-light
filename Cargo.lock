@@ -63,16 +63,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aes-keywrap-rs"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0179d260398111b7879868cabc56bc4045ad8111f0b4e5f656ba7f87d616e2fd"
-dependencies = [
- "crypto2",
- "hex",
-]
-
-[[package]]
 name = "aesm-client"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -780,12 +770,6 @@ dependencies = [
  "generic-array",
  "subtle",
 ]
-
-[[package]]
-name = "crypto2"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a161713d9e77a76b166714fc1efd2a7d0a6830e8be57eb727b215076fb62e7a4"
 
 [[package]]
 name = "ct-logs"
@@ -2848,7 +2832,6 @@ version = "0.3.0"
 dependencies = [
  "aes",
  "aes-gcm-siv",
- "aes-keywrap-rs",
  "base64",
  "ed25519-dalek",
  "flex-error",

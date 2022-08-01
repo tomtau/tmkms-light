@@ -29,7 +29,7 @@ fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn 
     } = config;
     let socket = TcpStream::connect(format!("{}:{}", host, port))?;
     // TODO: just unseal once in the caller
-    if let Ok(identity_key) = keypair_seal::unseal(&sealed_key) {
+    if let Ok(identity_key) = keypair_seal::unseal(sealed_key) {
         info!("KMS node ID: {}", PublicKey::from(&identity_key));
 
         let connection =
@@ -204,6 +204,7 @@ mod tests {
 
     // can be run with `cargo test --target x86_64-fortanix-unknown-sgx`
     #[test]
+    #[ignore]
     fn test_recover_flow() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
