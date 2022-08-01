@@ -10,18 +10,17 @@ serde = { version = "1", features = ["derive"] }
 ed25519 = { version = "1", features = ["serde"] }
 ed25519-dalek =  { version = "1", features = ["serde"] }
 rsa = { version = "0.5", features = ["serde", "alloc"] }
-sgx-isa = { version = "0.3", features = ["serde"] }
-thiserror = "1"
+sgx-isa = { version = "0.4", features = ["serde"] }
 tendermint = "0.23"
 tendermint-config = "0.23"
 tmkms-light = { path = "../../.." }
 zeroize = "1"
 
 [target.'cfg(not(target_env = "sgx"))'.dependencies]
-anomaly = "0.2"
 aesm-client = { version = "0.5", features = ["sgxs"] }
 dcap-ql = "0.3"
 enclave-runner = "0.5"
+flex-error = "0.4"
 serde_json = "1"
 sgxs-loaders = "0.3"
 structopt = "0.3"
@@ -30,4 +29,4 @@ tempfile = "3"
 tokio = { version = "= 0.2", features = ["uds"] }
 toml = "0.5"
 tracing = "0.1"
-tracing-subscriber = "0.2"
+tracing-subscriber = "0.3"
