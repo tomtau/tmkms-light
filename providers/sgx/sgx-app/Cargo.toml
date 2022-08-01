@@ -6,15 +6,15 @@ edition = "2021"
 
 [target.'cfg(target_env = "sgx")'.dependencies]
 aes = "0.8"
-aes-gcm-siv = "0.10"
+aes-gcm-siv = "0.11"
 base64 = "0.13"
 ed25519-dalek = "1"
 flex-error = "0.4"
 rand = "0.8"
-rsa = "0.5"
+rsa = "0.6"
 serde_json = "1"
-sha2 = "0.9"
-sgx-isa = { version = "0.3", features = ["sgxstd"] }
+sha2 = "0.10"
+sgx-isa = { version = "0.4", features = ["sgxstd"] }
 subtle = "2"
 subtle-encoding = "0.5"
 tendermint-p2p = "0.23"

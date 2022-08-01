@@ -5,13 +5,13 @@ use crate::sgx_app::keypair_seal::seal;
 use aes::cipher::generic_array::typenum::U32;
 use aes::cipher::generic_array::GenericArray;
 use aes_gcm_siv::{
-    aead::{Aead, NewAead, Payload},
-    Aes256GcmSiv,
+    aead::{Aead, Payload},
+    Aes256GcmSiv, KeyInit
 };
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::pkcs1::{FromRsaPrivateKey, ToRsaPrivateKey};
+use rsa::pkcs1::{EncodeRsaPrivateKey, DecodeRsaPrivateKey, der::Document};
 use rsa::{PaddingScheme, RsaPrivateKey, RsaPublicKey};
 use sgx_isa::ErrorCode;
 use sgx_isa::{Report, Targetinfo};
