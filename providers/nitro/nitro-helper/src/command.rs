@@ -7,7 +7,7 @@ use sysinfo::{ProcessExt, SystemExt};
 use tendermint_config::net;
 use tmkms_light::utils::write_u16_payload;
 use tmkms_light::utils::{print_pubkey, PubkeyDisplay};
-use vsock::SockAddr;
+use vsock::VsockAddr;
 
 use crate::command::nitro_enclave::describe_enclave;
 use crate::config::{EnclaveConfig, EnclaveOpt, NitroSignOpt, VSockProxyOpt};
@@ -171,9 +171,9 @@ pub fn start(
         aws_region: config.aws_region.clone(),
     };
     let addr = if let Some(cid) = cid {
-        SockAddr::new_vsock(cid, config.enclave_config_port)
+        VsockAddr::new(cid, config.enclave_config_port)
     } else {
-        SockAddr::new_vsock(config.enclave_config_cid, config.enclave_config_port)
+        VsockAddr::new(config.enclave_config_cid, config.enclave_config_port)
     };
     let mut socket = vsock::VsockStream::connect(&addr).map_err(|e| {
         format!(
