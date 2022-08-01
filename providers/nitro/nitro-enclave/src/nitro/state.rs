@@ -4,7 +4,7 @@ use tmkms_light::chain::state::{consensus, PersistStateSync, State, StateError};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tmkms_nitro_helper::VSOCK_HOST_CID;
 use tracing::{debug, trace};
-use vsock::{SockAddr, VsockStream};
+use vsock::{VsockAddr, VsockStream};
 
 /// as the state needs to be persisted outside of NE,
 /// this is a helper that communicates with the host to load the latest state
@@ -17,7 +17,7 @@ pub struct StateHolder {
 impl StateHolder {
     /// connects to the host via the vsock port specified in the configuration
     pub fn new(vsock_port: u32) -> io::Result<Self> {
-        let addr = SockAddr::new_vsock(VSOCK_HOST_CID, vsock_port);
+        let addr = VsockAddr::new(VSOCK_HOST_CID, vsock_port);
         let state_conn = vsock::VsockStream::connect(&addr)?;
         trace!("state vsock port: {}", vsock_port);
         trace!("state peer addr: {:?}", state_conn.peer_addr());

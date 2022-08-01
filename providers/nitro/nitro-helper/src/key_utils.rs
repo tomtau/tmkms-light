@@ -4,7 +4,7 @@ use crate::shared::{NitroKeygenConfig, NitroKeygenResponse, NitroRequest, NitroR
 use ed25519_dalek::PublicKey;
 use std::{fs::OpenOptions, io::Write, os::unix::fs::OpenOptionsExt, path::Path};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
-use vsock::SockAddr;
+use vsock::VsockAddr;
 
 pub(crate) mod credential {
     use crate::shared::AwsCredentials;
@@ -51,7 +51,7 @@ pub fn generate_key(
     };
 
     let request = NitroRequest::Keygen(keygen_request);
-    let addr = SockAddr::new_vsock(cid, port);
+    let addr = VsockAddr::new(cid, port);
     let mut socket = vsock::VsockStream::connect(&addr).map_err(|e| {
         format!(
             "failed to connect to the enclave to generate key pair: {:?}",
