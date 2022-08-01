@@ -5,7 +5,7 @@ use std::time::Duration;
 use tmkms_nitro_helper::tracing_layer::Log;
 use tracing::Level;
 use tracing::{debug, error, info, trace, warn};
-use vsock::{SockAddr, VsockListener};
+use vsock::{VsockAddr, VsockListener};
 
 /// Configuration parameters for port listening and remote destination
 pub struct LogServer {
@@ -28,7 +28,7 @@ impl LogServer {
             "binding enclave log server to vsock port: {}",
             self.local_port
         );
-        let sockaddr = SockAddr::new_vsock(self.cid, self.local_port);
+        let sockaddr = VsockAddr::new(self.cid, self.local_port);
         let listener = VsockListener::bind(&sockaddr)
             .map_err(|e| format!("Could not bind to {:?}, {:?}", sockaddr, e))?;
         info!("Bound enclave log server to {:?}", sockaddr);

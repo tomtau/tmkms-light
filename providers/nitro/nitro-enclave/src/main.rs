@@ -2,7 +2,7 @@ use tracing::Level;
 use tracing::{error, info, warn};
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
-use vsock::{SockAddr, VsockListener};
+use vsock::{VsockAddr, VsockListener};
 
 use tmkms_nitro_helper::tracing_layer::Layer;
 use tmkms_nitro_helper::VSOCK_HOST_CID;
@@ -43,7 +43,7 @@ fn main() {
     tracing::subscriber::set_global_default(layered).expect("setting default subscriber failed");
 
     const VMADDR_CID_ANY: u32 = 0xFFFFFFFF;
-    let addr = SockAddr::new_vsock(VMADDR_CID_ANY, port);
+    let addr = VsockAddr::new(VMADDR_CID_ANY, port);
     let listener = VsockListener::bind(&addr).expect("bind address");
     info!("waiting for config to be pushed on {}", addr);
     for conn in listener.incoming() {

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 use tracing::{error, info, trace};
-use vsock::{SockAddr, VsockListener};
+use vsock::{VsockAddr, VsockListener};
 
 /// Configuration parameters for port listening and remote destination
 pub struct Proxy {
@@ -29,7 +29,7 @@ impl Proxy {
     /// Returns the file descriptor for it or the appropriate error
     pub fn sock_listen(&self) -> Result<VsockListener, String> {
         info!("binding proxy to vsock port: {}", self.local_port);
-        let sockaddr = SockAddr::new_vsock(VSOCK_HOST_CID, self.local_port);
+        let sockaddr = VsockAddr::new(VSOCK_HOST_CID, self.local_port);
         let listener = VsockListener::bind(&sockaddr)
             .map_err(|_| format!("Could not bind to {:?}", sockaddr))?;
         info!("Bound to {:?}", sockaddr);

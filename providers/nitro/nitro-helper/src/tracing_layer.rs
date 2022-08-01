@@ -10,7 +10,7 @@ use tracing_core::{
     Field, Level, Metadata, Subscriber,
 };
 use tracing_subscriber::{layer::Context, registry::LookupSpan};
-use vsock::{SockAddr, VsockStream};
+use vsock::{VsockAddr, VsockStream};
 
 pub struct Layer {
     cid: u32,
@@ -28,7 +28,7 @@ impl Layer {
     }
 
     pub fn get_socket(&self) -> Result<VsockStream, String> {
-        let addr = SockAddr::new_vsock(self.cid, self.local_port);
+        let addr = VsockAddr::new(self.cid, self.local_port);
         VsockStream::connect(&addr).map_err(|e| {
             format!(
                 "failed to connect to the enclave server to push log: {:?}",

@@ -12,7 +12,7 @@ use tmkms_light::chain::state::{consensus, StateError};
 use tmkms_light::error::{io_error_wrap, Error};
 use tmkms_light::utils::{read_u16_payload, write_u16_payload};
 use tracing::{debug, info, warn};
-use vsock::{SockAddr, VsockListener, VsockStream};
+use vsock::{VsockAddr, VsockListener, VsockStream};
 
 /// helps the enclave to load the state previously persisted on the host
 /// + to persist new states
@@ -46,7 +46,7 @@ impl StateSyncer {
             )),
         }?;
 
-        let sockaddr = SockAddr::new_vsock(VSOCK_HOST_CID, vsock_port);
+        let sockaddr = VsockAddr::new(VSOCK_HOST_CID, vsock_port);
         let vsock_listener = VsockListener::bind(&sockaddr)
             .map_err(|e| StateError::sync_error("vsock".into(), e))?;
 
