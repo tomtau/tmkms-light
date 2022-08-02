@@ -1,6 +1,6 @@
 use aes_gcm_siv::{
-    aead::{generic_array::GenericArray, Aead, NewAead, Payload},
-    Aes128GcmSiv,
+    aead::{generic_array::GenericArray, Aead, Payload},
+    Aes128GcmSiv, KeyInit,
 };
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::{rngs::OsRng, RngCore};
