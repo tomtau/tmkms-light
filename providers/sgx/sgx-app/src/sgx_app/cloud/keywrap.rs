@@ -33,8 +33,8 @@ fn aes256_unwrap_key_and_iv(
             let b_i = i * 8;
             ciphertext[..8].copy_from_slice(&(a ^ t).to_be_bytes());
             ciphertext[8..].copy_from_slice(&r[b_i..][0..8]);
-            let mut block = GenericArray::from_mut_slice(&mut ciphertext);
-            cipher.decrypt_block(&mut block);
+            let block = GenericArray::from_mut_slice(&mut ciphertext);
+            cipher.decrypt_block(block);
             // SAFETY: static allocation above
             a = u64::from_be_bytes(ciphertext[..8].try_into().unwrap());
             r[b_i..][0..8].copy_from_slice(&ciphertext[8..]);
@@ -91,10 +91,51 @@ pub fn aes256_unwrap_key_with_pad(
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+    use aes::cipher::BlockEncrypt;
     use quickcheck::{Arbitrary, Gen};
     use quickcheck_macros::quickcheck;
+
+    /// quick test implementation based on https://www.ietf.org/rfc/rfc3394.txt
+    fn aes256_wrap_key_and_iv(
+        kek: &GenericArray<u8, U32>,
+        input: &GenericArray<u8, U32>,
+        iv: u64,
+    ) -> GenericArray<u8, U40> {
+        let n = input.len() / 8 - 1;
+        let mut r = vec![0u8; input.len() + 8];
+        r[..8].copy_from_slice(&u64::to_be_bytes(iv));
+        r[8..].copy_from_slice(&input);
+        let cipher = Aes256::new(kek);
+        let mut t = 0;
+        for _j in 0..6 {
+            for i in 1..=n + 1 {
+                t += 1;
+                let mut ciphertext = [0u8; 16];
+                let b_i = i * 8;
+                ciphertext[..8].copy_from_slice(&r[..8]);
+                ciphertext[8..].copy_from_slice(&r[b_i..][0..8]);
+                let block = GenericArray::from_mut_slice(&mut ciphertext);
+                cipher.encrypt_block(block);
+                let a = u64::from_be_bytes(ciphertext[..8].try_into().unwrap()) ^ t;
+                r[..8].copy_from_slice(&a.to_be_bytes());
+                r[b_i..][0..8].copy_from_slice(&ciphertext[8..]);
+            }
+        }
+
+        let mut ret = GenericArray::default();
+        ret.copy_from_slice(&r);
+        ret
+    }
+
+    /// quick test implementation with hardcoded http://www.ietf.org/rfc/rfc5649.txt
+    pub fn aes256_wrap_key_with_pad(kek: &[u8], plaintext: &[u8]) -> GenericArray<u8, U40> {
+        const IV: u64 = u64::from_be_bytes([0xa6, 0x59, 0x59, 0xa6, 0, 0, 0, 32]);
+        let key = GenericArray::from_slice(kek);
+        let input = GenericArray::from_slice(plaintext);
+        aes256_wrap_key_and_iv(key, input, IV)
+    }
 
     #[derive(Clone, Copy, Debug)]
     struct KeyWrap(pub [u8; 32]);
@@ -130,10 +171,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_padded_256bit_kek_and_256bit_key() {
+        let kek = subtle_encoding::hex::decode_upper(
+            "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F",
+        )
+        .unwrap();
+        let cipher = subtle_encoding::hex::decode_upper(
+            "4A8029243027353B0694CF1BD8FC745BB0CE8A739B19B1960B12426D4C39CFEDA926D103AB34E9F6",
+        )
+        .unwrap();
+        let plain = subtle_encoding::hex::decode_upper(
+            "00112233445566778899AABBCCDDEEFF000102030405060708090A0B0C0D0E0F",
+        )
+        .unwrap();
+        assert_eq!(cipher, aes256_wrap_key_with_pad(&kek, &plain).to_vec());
+        assert_eq!(
+            plain,
+            aes256_unwrap_key_with_pad(&kek, &cipher).unwrap().to_vec()
+        );
+    }
+
     #[quickcheck]
     fn wrap_unwrap(kek: KeyWrap, key: KeyWrap) -> bool {
-        let wrapped =
-            aes_keywrap_rs::Aes256Kw::aes_wrap_key_with_pad(&kek.0, &key.0).expect("wrap key");
+        let wrapped = aes256_wrap_key_with_pad(&kek.0, &key.0);
         let unwrap = aes256_unwrap_key_with_pad(&kek.0, &wrapped).expect("unwrap");
         let uref: &[u8] = unwrap.as_ref();
         uref == &key.0

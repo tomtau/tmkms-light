@@ -29,7 +29,7 @@ fn get_secret_connection(config: &RemoteConnectionConfig) -> io::Result<Box<dyn 
     } = config;
     let socket = TcpStream::connect(format!("{}:{}", host, port))?;
     // TODO: just unseal once in the caller
-    if let Ok(identity_key) = keypair_seal::unseal(&sealed_key) {
+    if let Ok(identity_key) = keypair_seal::unseal(sealed_key) {
         info!("KMS node ID: {}", PublicKey::from(&identity_key));
 
         let connection =

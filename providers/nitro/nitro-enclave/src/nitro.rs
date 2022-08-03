@@ -116,7 +116,7 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                 )
                 .map_err(|_e| Error::access_error())?,
             );
-            let secret = ed25519::SecretKey::from_bytes(&*key_bytes)
+            let secret = ed25519::SecretKey::from_bytes(&key_bytes)
                 .map_err(|_e| Error::invalid_key_error())?;
             let public = ed25519::PublicKey::from(&secret);
             let keypair = ed25519::Keypair { secret, public };
@@ -131,7 +131,7 @@ pub fn entry(mut stream: VsockStream) -> Result<(), Error> {
                     )
                     .map_err(|_e| Error::access_error())?,
                 );
-                let id_secret = ed25519::SecretKey::from_bytes(&*id_key_bytes)
+                let id_secret = ed25519::SecretKey::from_bytes(&id_key_bytes)
                     .map_err(|_e| Error::invalid_key_error())?;
                 let id_public = ed25519::PublicKey::from(&id_secret);
                 let id_keypair = ed25519::Keypair {

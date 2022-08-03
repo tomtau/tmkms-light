@@ -35,7 +35,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install protobuf-compiler
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-12-09
+          toolchain: nightly-2022-08-01
           components: clippy
           override: true
           profile: minimal
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2021-12-09
+          toolchain: nightly-2022-08-01
           override: true
           profile: minimal
       - name: Install cargo audit
@@ -55,20 +55,16 @@ jobs:
       # TODO: unmaintained dependencies -- need to be fixed in upstream
       # RUSTSEC-2019-0036,RUSTSEC-2020-0036: failure crate used in upstream sgxs-* crates
       # RUSTSEC-2020-0071: time crate used in upstream sgxs-* crates
-      # RUSTSEC-2021-0121: not relevant, crypto2 only used in tests
       # RUSTSEC-2021-0127: serde_cbor used in upstream nsm-* crates
       # RUSTSEC-2020-0016,RUSTSEC-2021-0124: net2 used in mio from older tokio (used in sgx crates)
-      # RUSTSEC-2021-0119: older nix crates used in nsm-* and vsock crates (API not used though)
       - run: >
           cargo audit --deny warnings
-          --ignore RUSTSEC-2020-0036
-          --ignore RUSTSEC-2019-0036
-          --ignore RUSTSEC-2021-0121
-          --ignore RUSTSEC-2021-0127
-          --ignore RUSTSEC-2020-0016
-          --ignore RUSTSEC-2021-0124
-          --ignore RUSTSEC-2021-0119
           --ignore RUSTSEC-2020-0071
+          --ignore RUSTSEC-2021-0124
+          --ignore RUSTSEC-2020-0036
+          --ignore RUSTSEC-2020-0016
+          --ignore RUSTSEC-2021-0127
+          --ignore RUSTSEC-2019-0036
   
   build:
     runs-on: ubuntu-latest
@@ -79,7 +75,7 @@ jobs:
           - tmkms-light-sgx-runner
           - tmkms-softsign
         rust:
-          - nightly-2021-12-09
+          - nightly-2022-08-01
         target:
           - x86_64-unknown-linux-gnu
     steps:
@@ -108,7 +104,7 @@ jobs:
         crate:
           - tmkms-light-sgx-app
         rust:
-          - nightly-2021-12-09
+          - nightly-2022-08-01
         target:
           - x86_64-fortanix-unknown-sgx
     steps:
