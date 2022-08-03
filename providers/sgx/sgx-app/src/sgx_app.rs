@@ -204,7 +204,6 @@ mod tests {
 
     // can be run with `cargo test --target x86_64-fortanix-unknown-sgx`
     #[test]
-    #[ignore]
     fn test_recover_flow() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
