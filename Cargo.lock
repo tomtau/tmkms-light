@@ -2812,7 +2812,7 @@ checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
 name = "tmkms-light"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ed25519-dalek",
  "flex-error",
@@ -2828,7 +2828,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-light-sgx-app"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aes",
  "aes-gcm-siv",
@@ -2854,7 +2854,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-light-sgx-runner"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aesm-client",
  "base64",
@@ -2883,7 +2883,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-nitro-enclave"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aws-ne-sys",
  "aws-nitro-enclaves-nsm-api",
@@ -2907,7 +2907,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-nitro-helper"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aws-config",
  "aws-types",
@@ -2934,7 +2934,7 @@ dependencies = [
 
 [[package]]
 name = "tmkms-softsign"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ed25519-dalek",
  "flex-error",

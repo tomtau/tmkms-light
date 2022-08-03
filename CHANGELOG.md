@@ -1,3 +1,21 @@
+*August 4, 2022*
+
+Many dependency upgrades.
+
+## v0.4.0
+### Breaking changes
+* [356](https://github.com/crypto-com/tmkms-light/pull/356) NE production enclave file logging removed
+in order to remove a vulnerable crate (you can use the default console logging and e.g. the Journald service instead)
+
+### Improvements
+* [288](https://github.com/crypto-com/tmkms-light/pull/288) switch to the official AWS Rust SDK
+* [286](https://github.com/crypto-com/tmkms-light/pull/286) switch from the deprecated error-reporting crate
+* [308](https://github.com/crypto-com/tmkms-light/pull/308) NE init command check if vsock-proxy is running
+* [342](https://github.com/crypto-com/tmkms-light/pull/342) NE launch-all consistent exit code for errors
+
+### Bug Fixes
+* [305](https://github.com/crypto-com/tmkms-light/pull/305) NE init fixed
+
 *October 29, 2021*
 
 Many dependency upgrades and NE improvements.

@@ -1,6 +1,6 @@
 [package]
 name = "tmkms-light-sgx-runner"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>", "Linfeng Yuan <linfeng@crypto.com>"]
 edition = "2021"
 
