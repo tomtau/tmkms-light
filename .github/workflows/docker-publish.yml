@@ -26,7 +26,7 @@ jobs:
           push: true
           file: Dockerfile.nitro
           build-args: |
-            RUST_TOOLCHAIN=1.56.1
+            RUST_TOOLCHAIN=1.62.1
           tags: |
             cryptocom/nitro-enclave-tmkms:latest
             cryptocom/nitro-enclave-tmkms:${{ steps.get_version.outputs.VERSION }}
