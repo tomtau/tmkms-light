@@ -1,3 +1,11 @@
+*August 9, 2022*
+
+A bug fix for the SGX provider and a few dependency upgrades.
+
+## v0.4.1
+### Bug Fixes
+* [387](https://github.com/crypto-com/tmkms-light/pull/387) SGX initialization and communication fix 
+
 *August 4, 2022*
 
 Many dependency upgrades.

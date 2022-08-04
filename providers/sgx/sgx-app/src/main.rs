@@ -4,6 +4,10 @@ mod sgx_app;
 #[cfg(target_env = "sgx")]
 fn main() -> std::io::Result<()> {
     let mut args = std::env::args();
+    // enclave-runner had a breaking change that it started to pass the enclave path
+    if args.len() > 2 {
+        let _path = args.next();
+    }
     let command = args.next();
     let log_level = match args.next() {
         Some(s) if s == "verbose" => tracing::Level::DEBUG,
