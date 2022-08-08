@@ -2004,9 +2004,9 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.10.4"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71adf41db68aa0daaefc69bb30bcd68ded9b9abaad5d1fbb6304c4fb390e083e"
+checksum = "399c3c31cdec40583bb68f0b18403400d01ec4289c383aa047560439952c4dd7"
 dependencies = [
  "bytes 1.2.1",
  "prost-derive",
@@ -2014,9 +2014,9 @@ dependencies = [
 
 [[package]]
 name = "prost-derive"
-version = "0.10.1"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b670f45da57fb8542ebdbb6105a925fe571b67f9e7ed9f47a06a84e72b4e7cc"
+checksum = "7345d5f0e08c0536d7ac7229952590239e77abf0a0100a1b1d890add6ea96364"
 dependencies = [
  "anyhow",
  "itertools",
@@ -2027,9 +2027,9 @@ dependencies = [
 
 [[package]]
 name = "prost-types"
-version = "0.10.1"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
+checksum = "4dfaa718ad76a44b3415e6c4d53b17c8f99160dcb3a99b10470fce8ad43f6e3e"
 dependencies = [
  "bytes 1.2.1",
  "prost",
@@ -2658,9 +2658,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint"
-version = "0.23.8"
+version = "0.23.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a199518e0366ba0aeb0d0e0a59dbd99ea0bdc14280f414ecc758c9228a454ad8"
+checksum = "467f82178deeebcd357e1273a0c0b77b9a8a0313ef7c07074baebe99d87851f4"
 dependencies = [
  "async-trait",
  "bytes 1.2.1",
@@ -2687,9 +2687,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-config"
-version = "0.23.8"
+version = "0.23.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6d8f6a64ae3b59ea3c73efad727271ee085b544b817d7f46901817ca6bb1773"
+checksum = "2d42ee0abc27ef5fc34080cce8d43c189950d331631546e7dfb983b6274fa327"
 dependencies = [
  "flex-error",
  "serde",
@@ -2701,9 +2701,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-p2p"
-version = "0.23.8"
+version = "0.23.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87c1c10e044ce8c86a21837bdf2efc7bcce1436c7a1cc468bca910b5c266be46"
+checksum = "547ff0499270c64ffc164985d8e190d7d7b32bae5eca68fab2b22c5bcaddf295"
 dependencies = [
  "aead 0.4.3",
  "chacha20poly1305",
@@ -2727,9 +2727,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-proto"
-version = "0.23.8"
+version = "0.23.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b303d6387aaea38cea7ef924476d1f798573044e7b4f6ddd1166ac5184b2281"
+checksum = "68ce80bf536476db81ecc9ebab834dc329c9c1509a694f211a73858814bfe023"
 dependencies = [
  "bytes 1.2.1",
  "flex-error",
@@ -2745,9 +2745,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-std-ext"
-version = "0.23.8"
+version = "0.23.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23430464d228dbbe10da041b1ebaf49b8d752bf5c54dfb3d166a9dc660eedfaa"
+checksum = "22565badd78ad048c6d960aacd88282dc11d2934ecf196768c9740ebf6e20f67"
 
 [[package]]
 name = "textwrap"
