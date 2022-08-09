@@ -63,10 +63,11 @@ pub fn read_u16_payload<S: Read>(stream: &mut S) -> Result<Vec<u8>, Error> {
         let mut total = 0;
 
         while let Ok(n) = stream.read(&mut state_raw[total..]) {
-            if n == 0 || n + total > l {
+            total += n;
+            // no more data to read
+            if n == 0 || total >= l {
                 break;
             }
-            total += n;
         }
 
         if total == 0 {
