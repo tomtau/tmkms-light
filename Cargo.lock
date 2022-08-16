@@ -1689,6 +1689,8 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
+ "memoffset 0.6.5",
+ "pin-utils",
 ]
 
 [[package]]
@@ -2901,7 +2903,7 @@ dependencies = [
  "aws-nitro-enclaves-nsm-api",
  "ed25519-dalek",
  "flex-error",
- "nix 0.24.2",
+ "nix 0.25.0",
  "rand_core 0.6.3",
  "serde_bytes",
  "serde_json",
@@ -2926,7 +2928,7 @@ dependencies = [
  "ctrlc",
  "ed25519-dalek",
  "flex-error",
- "nix 0.24.2",
+ "nix 0.25.0",
  "serde",
  "serde_json",
  "structopt",
