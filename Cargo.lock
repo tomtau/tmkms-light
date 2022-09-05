@@ -472,6 +472,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69cce20737498f97b993470a6e536b8523f0af7892a4f928cceb1ac5e52ebe7e"
+dependencies = [
+ "generic-array",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -821,7 +830,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b9fdf9972b2bd6af2d913799d9ebc165ea4d2e65878e329d9c6b372c4491b61"
 dependencies = [
  "byteorder",
- "digest",
+ "digest 0.9.0",
  "rand_core 0.5.1",
  "subtle",
  "zeroize",
@@ -875,6 +884,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "digest"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2fb860ca6fafa5552fb6d0e816a69c8e49f0908bf524e30a90d97c85892d506"
+dependencies = [
+ "block-buffer 0.10.3",
+ "crypto-common",
+]
+
+[[package]]
 name = "ed25519"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -894,7 +913,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_bytes",
- "sha2",
+ "sha2 0.9.9",
  "zeroize",
 ]
 
@@ -1247,7 +1266,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51ab2f639c231793c5f6114bdb9bbe50a7dbbfcd7c7c6bd8475dec2d991e964f"
 dependencies = [
- "digest",
+ "digest 0.9.0",
  "hmac",
 ]
 
@@ -1258,7 +1277,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1441c6b1e930e2817404b5046f1f989899143a12bf92de603b69f4e0aee1e15"
 dependencies = [
  "crypto-mac",
- "digest",
+ "digest 0.9.0",
 ]
 
 [[package]]
@@ -2244,7 +2263,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e05c2603e2823634ab331437001b411b9ed11660fbc4066f3908c84a9439260d"
 dependencies = [
  "byteorder",
- "digest",
+ "digest 0.9.0",
  "lazy_static",
  "num-bigint-dig",
  "num-integer",
@@ -2469,11 +2488,22 @@ version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800"
 dependencies = [
- "block-buffer",
+ "block-buffer 0.9.0",
  "cfg-if 1.0.0",
  "cpufeatures 0.2.2",
- "digest",
+ "digest 0.9.0",
  "opaque-debug",
+]
+
+[[package]]
+name = "sha2"
+version = "0.10.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf9db03534dff993187064c4e0c05a5708d2a9728ace9a8959b77bedf415dac5"
+dependencies = [
+ "cfg-if 1.0.0",
+ "cpufeatures 0.2.2",
+ "digest 0.10.3",
 ]
 
 [[package]]
@@ -2674,7 +2704,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_repr",
- "sha2",
+ "sha2 0.9.9",
  "signature",
  "subtle",
  "subtle-encoding",
@@ -2713,7 +2743,7 @@ dependencies = [
  "merlin",
  "prost",
  "rand_core 0.5.1",
- "sha2",
+ "sha2 0.9.9",
  "signature",
  "subtle",
  "tendermint",
@@ -2839,7 +2869,7 @@ dependencies = [
  "rsa",
  "serde_json",
  "sgx-isa",
- "sha2",
+ "sha2 0.10.5",
  "subtle",
  "subtle-encoding",
  "tendermint-p2p",
