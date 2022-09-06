@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::{fmt, io::Write};
+use tracing::warn;
 use tracing_core::{
     event::Event,
     field::Visit,
@@ -11,6 +12,30 @@ use tracing_core::{
 };
 use tracing_subscriber::{layer::Context, registry::LookupSpan};
 use vsock::{VsockAddr, VsockStream};
+
+macro_rules! return_from_utf8_error {
+    ($res:expr) => {
+        match $res {
+            Ok(val) => val,
+            Err(e) => {
+                warn!("unable to convert vector of byte to string: {}", e);
+                return;
+            }
+        }
+    };
+}
+macro_rules! break_from_checked_add_overflow {
+    ($res:expr) => {
+        match $res {
+            Some(val) => val,
+            None => {
+                warn!("overflow when adding two usize value");
+                break;
+            }
+        }
+    };
+}
+pub(crate) use {break_from_checked_add_overflow, return_from_utf8_error};
 
 pub struct Layer {
     cid: u32,
@@ -294,10 +319,24 @@ impl Log {
 
                 let mut value_len_raw = [0; 8];
                 value_len_raw.copy_from_slice(&raw[index_value_len_begin..index_value_len_end]);
-                let value_len = u64::from_le_bytes(value_len_raw) as usize;
+                let value_len_u64 = u64::from_le_bytes(value_len_raw);
+                if value_len_u64 > usize::MAX as u64 {
+                    warn!("unable to convert slice index from u64 to usize when value_len_raw in u64 > {}", usize::MAX);
+                    break;
+                }
 
                 let index_value_begin = index_value_len_end;
-                let index_value_end = index_value_begin + value_len;
+                let index_value_end = break_from_checked_add_overflow!(
+                    index_value_begin.checked_add(value_len_u64 as usize)
+                );
+                if index_value_end > len {
+                    warn!(
+                        "index_value_end {} is bigger than raw slice length {}",
+                        index_value_end, len
+                    );
+                    break;
+                }
+
                 flag_index_next = index_value_end + 1;
                 let value_raw = &raw[index_value_begin..index_value_end];
                 log.update(key_raw, value_raw);
@@ -309,7 +348,7 @@ impl Log {
     }
 
     fn update(&mut self, key_raw: &[u8], value_raw: &[u8]) {
-        let key = String::from_utf8(key_raw.to_vec()).unwrap();
+        let key = return_from_utf8_error!(String::from_utf8(key_raw.to_vec()));
         match key.as_str() {
             "PRIORITY" => {
                 let mut v = [0; 1];
@@ -318,23 +357,23 @@ impl Log {
                 self.level = value;
             }
             "MESSAGE" => {
-                let value = String::from_utf8(value_raw.to_vec()).unwrap();
+                let value = return_from_utf8_error!(String::from_utf8(value_raw.to_vec()));
                 self.message = value;
             }
             "TARGET" => {
-                let value = String::from_utf8(value_raw.to_vec()).unwrap();
+                let value = return_from_utf8_error!(String::from_utf8(value_raw.to_vec()));
                 self.target = value;
             }
             "CODE_FILE" => {
-                let value = String::from_utf8(value_raw.to_vec()).unwrap();
+                let value = return_from_utf8_error!(String::from_utf8(value_raw.to_vec()));
                 self.code_file = value;
             }
             "CODE_LINE" => {
-                let value = String::from_utf8(value_raw.to_vec()).unwrap();
-                self.code_line = value.parse().unwrap();
+                let value = return_from_utf8_error!(String::from_utf8(value_raw.to_vec()));
+                self.code_line = value.parse().unwrap_or_default();
             }
             _ => {
-                let value = String::from_utf8(value_raw.to_vec()).unwrap();
+                let value = return_from_utf8_error!(String::from_utf8(value_raw.to_vec()));
                 self.debug.insert(key.to_lowercase(), value);
             }
         }
