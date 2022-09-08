@@ -1,8 +1,8 @@
 use crate::shared::AwsCredentials;
+use clap::StructOpt;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::{convert::TryFrom, path::PathBuf};
-use structopt::StructOpt;
 use tendermint::chain;
 use tendermint_config::net;
 
@@ -48,7 +48,7 @@ impl NitroSignOpt {
 #[derive(StructOpt, Clone, Serialize, Deserialize, Debug)]
 pub struct VSockProxyOpt {
     /// "Set the maximum number of simultaneous connections supported."
-    #[structopt(long, short = "w", default_value = "4")]
+    #[structopt(long, short = 'w', default_value = "4")]
     pub num_workers: usize,
     /// "Local vsock port to listen for incoming connections."
     #[structopt(long, default_value = "8000")]
@@ -79,10 +79,10 @@ impl Default for VSockProxyOpt {
 #[derive(StructOpt, Clone, Serialize, Deserialize, Debug)]
 pub struct EnclaveOpt {
     /// The path to the enclave image file
-    #[structopt(long, short = "p", default_value = "/home/ec2-user/.tmkms/tmkms.eif")]
+    #[structopt(long, short = 'p', default_value = "/home/ec2-user/.tmkms/tmkms.eif")]
     pub eif_path: String,
     /// The optional enclave CID
-    #[structopt(long, short = "i")]
+    #[structopt(long, short = 'i')]
     pub enclave_cid: Option<u64>,
     /// The amount of memory that will be given to the enclave.
     #[structopt(long, default_value = "512")]

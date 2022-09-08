@@ -12,7 +12,7 @@ ed25519-dalek = "1"
 rand_core = { version = "0.6", features = ["std"] }
 serde = { version = "1", features = ["serde_derive"] }
 serde_json = "1"
-structopt = "0.3"
+clap = {version = "3", features = ["derive"] }
 subtle = "2"
 subtle-encoding = { version = "0.5", features = ["bech32-preview"] }
 tempfile = "3"

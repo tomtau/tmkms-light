@@ -13,9 +13,9 @@ use config::{EnclaveOpt, VSockProxyOpt};
 
 use crate::command::nitro_enclave::run_vsock_proxy;
 use crate::config::{EnclaveConfig, NitroSignOpt};
+use clap::StructOpt;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
-use structopt::StructOpt;
 use tmkms_light::utils::PubkeyDisplay;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
@@ -29,6 +29,7 @@ use tracing_subscriber::FmtSubscriber;
 enum TmkmsLight {
     #[structopt(flatten)]
     Helper(CommandHelper),
+    #[structopt(subcommand)]
     Enclave(CommandEnclave),
 }
 
