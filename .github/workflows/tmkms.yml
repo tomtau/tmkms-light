@@ -15,41 +15,31 @@ jobs:
   rustfmt:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           components: rustfmt
-          override: true
-          profile: minimal
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: cargo fmt --all -- --check
 
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install protobuf-compiler
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2022-08-01
           components: clippy
-          override: true
-          profile: minimal
+          toolchain: nightly-2022-08-01
       - run: cargo clippy --all -- -D warnings
 
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2022-08-01
-          override: true
-          profile: minimal
       - name: Install cargo audit
         run: cargo install cargo-audit
       # TODO: unmaintained dependencies -- need to be fixed in upstream
@@ -79,21 +69,15 @@ jobs:
           - tmkms-nitro-helper
           - tmkms-light-sgx-runner
           - tmkms-softsign
-        rust:
-          - nightly-2022-08-01
-        target:
-          - x86_64-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install protobuf-compiler
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          target: ${{ matrix.target }}
-          override: true
-      - run: cargo build --target ${{ matrix.target }} -p ${{ matrix.crate }} --release
+          targets: x86_64-unknown-linux-gnu
+          toolchain: nightly-2022-08-01
+      - run: cargo build --target x86_64-unknown-linux-gnu -p ${{ matrix.crate }} --release
       - name: 'Tar files'
         run: cd target/x86_64-unknown-linux-gnu/release/ && tar -cvf tmkms-softsign.tar tmkms-softsign
         if: startsWith(matrix.crate, 'tmkms-softsign')
@@ -104,27 +88,17 @@ jobs:
           path: target/x86_64-unknown-linux-gnu/release/tmkms-softsign.tar
   build-sgx:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        crate:
-          - tmkms-light-sgx-app
-        rust:
-          - nightly-2022-08-01
-        target:
-          - x86_64-fortanix-unknown-sgx
     steps:
-      - uses: actions/checkout@v1
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          target: ${{ matrix.target }}
-          override: true
-      - run: cargo build --target ${{ matrix.target }} -p ${{ matrix.crate }} --release
+          targets: x86_64-fortanix-unknown-sgx
+          toolchain: nightly-2022-08-01
+      - run: cargo build --target x86_64-fortanix-unknown-sgx -p tmkms-light-sgx-app --release
   build-nitro:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
       - name: Build tmkms-nitro-enclave with docker
         uses: docker/build-push-action@v2
         with:
@@ -137,7 +111,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v3
       - uses: cachix/install-nix-action@v14
       - uses: cachix/cachix-action@v10
         with:
