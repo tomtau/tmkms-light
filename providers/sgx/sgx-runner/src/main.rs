@@ -4,7 +4,7 @@ mod runner;
 mod shared;
 mod state;
 use crate::config::RecoverConfig;
-use clap::StructOpt;
+use clap::Parser;
 use shared::SgxInitRequest;
 use std::fmt::Debug;
 use std::path::PathBuf;
@@ -12,58 +12,58 @@ use tmkms_light::utils::PubkeyDisplay;
 use tracing::{error, Level};
 use tracing_subscriber::FmtSubscriber;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[command(
     name = "tmkms-light-sgx-runner",
     about = "runner for signing backend app using SGX"
 )]
 enum TmkmsLight {
-    #[structopt(name = "cloud-wrap", about = "Generate a wrap key for cloud backups")]
+    #[command(name = "cloud-wrap", about = "Generate a wrap key for cloud backups")]
     /// Create config + keygen
     CloudWrapKeyGen {
-        #[structopt(short)]
+        #[arg(short)]
         enclave_path: Option<PathBuf>,
-        #[structopt(short)]
+        #[arg(short)]
         sealed_wrap_key_path: Option<PathBuf>,
-        #[structopt(short)]
+        #[arg(short)]
         dcap: bool,
         /// log level, default: info, -v: info, -vv: debug, -vvv: trace
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
-    #[structopt(name = "init", about = "Create config and generate keys")]
+    #[command(name = "init", about = "Create config and generate keys")]
     /// Create config + keygen
     Init {
-        #[structopt(short)]
+        #[arg(short)]
         config_path: Option<PathBuf>,
-        #[structopt(short)]
+        #[arg(short)]
         pubkey_display: Option<PubkeyDisplay>,
-        #[structopt(short)]
+        #[arg(short)]
         bech32_prefix: Option<String>,
-        #[structopt(short)]
+        #[arg(short)]
         wrap_backup_key_path: Option<PathBuf>,
-        #[structopt(short)]
+        #[arg(short)]
         external_cloud_key_path: Option<PathBuf>,
-        #[structopt(short)]
+        #[arg(short)]
         key_backup_data_path: Option<PathBuf>,
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
-    #[structopt(name = "recover", about = "Recover from cloud backup")]
+    #[command(name = "recover", about = "Recover from cloud backup")]
 
     /// Recover from cloud backup payload
     Recover {
-        #[structopt(flatten)]
+        #[command(flatten)]
         config: RecoverConfig,
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
-    #[structopt(name = "start", about = "Start tmkms process")]
+    #[command(name = "start", about = "Start tmkms process")]
     /// start tmkms process
     Start {
-        #[structopt(short)]
+        #[arg(short)]
         config_path: Option<PathBuf>,
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
 }
@@ -80,7 +80,7 @@ fn set_log(v: u32) -> String {
 }
 
 fn main() {
-    let opt = TmkmsLight::from_args();
+    let opt = TmkmsLight::parse();
     let result = match opt {
         TmkmsLight::CloudWrapKeyGen {
             enclave_path,

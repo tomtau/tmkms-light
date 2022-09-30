@@ -13,7 +13,7 @@ use config::{EnclaveOpt, VSockProxyOpt};
 
 use crate::command::nitro_enclave::run_vsock_proxy;
 use crate::config::{EnclaveConfig, NitroSignOpt};
-use clap::StructOpt;
+use clap::Parser;
 use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use tmkms_light::utils::PubkeyDisplay;
@@ -21,90 +21,88 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 /// Helper sub-commands
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[command(
     name = "tmkms-nitro-helper",
     about = "helper (proxies etc.) for nitro enclave execution"
 )]
 enum TmkmsLight {
-    #[structopt(flatten)]
+    #[command(flatten)]
     Helper(CommandHelper),
-    #[structopt(subcommand)]
+    #[command(subcommand)]
     Enclave(CommandEnclave),
 }
 
 /// enclave sub-commands
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 enum CommandEnclave {
-    #[structopt(name = "info", about = "get tmkms info")]
+    #[command(name = "info", about = "get tmkms info")]
     Info,
-    #[structopt(name = "run", about = "run enclave")]
+    #[command(name = "run", about = "run enclave")]
     RunEnclave {
-        #[structopt(flatten)]
+        #[command(flatten)]
         opt: EnclaveOpt,
         /// log level, default: info, -v: info, -vv: debug, -vvv: trace
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
-    #[structopt(name = "stop", about = "stop enclave")]
+    #[command(name = "stop", about = "stop enclave")]
     StopEnclave {
         /// Stop the enclave cid
-        #[structopt(long)]
+        #[arg(long)]
         cid: Option<String>,
     },
-    #[structopt(name = "vsock-proxy", about = "launch vsock proxy")]
+    #[command(name = "vsock-proxy", about = "launch vsock proxy")]
     RunProxy {
-        #[structopt(flatten)]
+        #[command(flatten)]
         opt: VSockProxyOpt,
         /// log level, default: info, -v: info, -vv: debug, -vvv: trace
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
 }
 
 /// Helper sub-commands
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 enum CommandHelper {
-    #[structopt(name = "init", about = "Create config + keygen")]
+    #[command(name = "init", about = "Create config + keygen")]
     /// Create config + keygen
     Init {
         /// the directory put the generated config files
-        #[structopt(short, default_value = "./")]
+        #[arg(short, default_value = "./")]
         config_dir: PathBuf,
-        #[structopt(short)]
+        #[arg(short)]
         pubkey_display: Option<PubkeyDisplay>,
-        #[structopt(short)]
+        #[arg(short)]
         bech32_prefix: Option<String>,
-        #[structopt(short)]
+        #[arg(short)]
         aws_region: String,
-        #[structopt(short)]
+        #[arg(short)]
         kms_key_id: String,
-        #[structopt(long)]
+        #[arg(long)]
         cid: Option<u32>,
     },
-    #[structopt(name = "start", about = "start tmkms process")]
+    #[command(name = "start", about = "start tmkms process")]
     /// start tmkms process (push config + start up proxy and state persistence)
     Start {
-        #[structopt(short, default_value = "tmkms.toml")]
+        #[arg(short, default_value = "tmkms.toml")]
         config_path: PathBuf,
-        #[structopt(long)]
+        #[arg(long)]
         cid: Option<u32>,
-        #[structopt(short, parse(from_occurrences))]
         /// log level, default: info, -v: info, -vv: debug, -vvv: trace
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
-    #[structopt(name = "launch-all", about = "launch all")]
+    #[command(name = "launch-all", about = "launch all")]
     LaunchAll {
         /// tmkms config path
-        #[structopt(short, default_value = "tmkms.toml")]
+        #[arg(short, default_value = "tmkms.toml")]
         tmkms_config: PathBuf,
         /// enclave config path
-        #[structopt(short, default_value = "enclave.toml")]
+        #[arg(short, default_value = "enclave.toml")]
         enclave_config: PathBuf,
-        #[structopt(short, parse(from_occurrences))]
         /// log level, default: info, -v: info, -vv: debug, -vvv: trace
-        #[structopt(short, parse(from_occurrences))]
+        #[arg(short, action = clap::ArgAction::Count)]
         v: u32,
     },
 }
@@ -122,7 +120,7 @@ fn set_logger(v: u32) -> Result<(), String> {
 }
 
 fn run() -> Result<(), String> {
-    let opt = TmkmsLight::from_args();
+    let opt = TmkmsLight::parse();
     match opt {
         TmkmsLight::Helper(CommandHelper::Init {
             config_dir,

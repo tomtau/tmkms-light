@@ -1,6 +1,6 @@
 use crate::shared::CloudBackupKeyData;
 use crate::shared::SealedKeyData;
-use clap::StructOpt;
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, path::PathBuf};
 use std::{fs::OpenOptions, io, os::unix::fs::OpenOptionsExt, path::Path};
@@ -76,20 +76,20 @@ pub fn write_backup_file<P: AsRef<Path>>(
     write_json_file(path, sealed_data)
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Parser, Debug)]
 pub struct RecoverConfig {
-    #[structopt(short)]
+    #[arg(short)]
     pub config_path: Option<PathBuf>,
-    #[structopt(short)]
+    #[arg(short)]
     pub pubkey_display: Option<PubkeyDisplay>,
-    #[structopt(short)]
+    #[arg(short)]
     pub bech32_prefix: Option<String>,
-    #[structopt(short)]
+    #[arg(short)]
     pub wrap_backup_key_path: PathBuf,
-    #[structopt(short)]
+    #[arg(short)]
     pub external_cloud_key_path: PathBuf,
-    #[structopt(short)]
+    #[arg(short)]
     pub key_backup_data_path: PathBuf,
-    #[structopt(short)]
+    #[arg(short)]
     pub recover_consensus_key: bool,
 }

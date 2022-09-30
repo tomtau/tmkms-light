@@ -5,7 +5,7 @@ use tracing::{debug, trace};
 use crate::error::Error;
 
 /// Options for displaying public key
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum PubkeyDisplay {
     Base64,
     Bech32,
