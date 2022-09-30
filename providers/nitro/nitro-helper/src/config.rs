@@ -1,5 +1,5 @@
 use crate::shared::AwsCredentials;
-use clap::StructOpt;
+use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::{convert::TryFrom, path::PathBuf};
@@ -45,22 +45,22 @@ impl NitroSignOpt {
     }
 }
 
-#[derive(StructOpt, Clone, Serialize, Deserialize, Debug)]
+#[derive(Parser, Clone, Serialize, Deserialize, Debug)]
 pub struct VSockProxyOpt {
     /// "Set the maximum number of simultaneous connections supported."
-    #[structopt(long, short = 'w', default_value = "4")]
+    #[arg(long, short = 'w', default_value = "4")]
     pub num_workers: usize,
     /// "Local vsock port to listen for incoming connections."
-    #[structopt(long, default_value = "8000")]
+    #[arg(long, default_value = "8000")]
     pub local_port: u32,
     /// "Remote TCP port of the server to be proxyed."
-    #[structopt(long, default_value = "443")]
+    #[arg(long, default_value = "443")]
     pub remote_port: u16,
     /// "Address of the server to be proxyed."
-    #[structopt(long)]
+    #[arg(long)]
     pub remote_addr: String,
     /// "YAML file containing the services that can be forwarded.\n"
-    #[structopt(long, default_value = "/etc/nitro_enclaves/vsock-proxy.yaml")]
+    #[arg(long, default_value = "/etc/nitro_enclaves/vsock-proxy.yaml")]
     pub config_file: String,
 }
 
@@ -76,22 +76,22 @@ impl Default for VSockProxyOpt {
     }
 }
 
-#[derive(StructOpt, Clone, Serialize, Deserialize, Debug)]
+#[derive(Parser, Clone, Serialize, Deserialize, Debug)]
 pub struct EnclaveOpt {
     /// The path to the enclave image file
-    #[structopt(long, short = 'p', default_value = "/home/ec2-user/.tmkms/tmkms.eif")]
+    #[arg(long, short = 'p', default_value = "/home/ec2-user/.tmkms/tmkms.eif")]
     pub eif_path: String,
     /// The optional enclave CID
-    #[structopt(long, short = 'i')]
+    #[arg(long, short = 'i')]
     pub enclave_cid: Option<u64>,
     /// The amount of memory that will be given to the enclave.
-    #[structopt(long, default_value = "512")]
+    #[arg(long, default_value = "512")]
     pub memory_mib: u64,
     /// The number of CPUs that the enclave will receive.
-    #[structopt(long, conflicts_with("cpu_ids"))]
+    #[arg(long, conflicts_with("cpu_ids"))]
     pub cpu_count: usize,
     /// Set the enclave log server port
-    #[structopt(long, default_value = "6050")]
+    #[arg(long, default_value = "6050")]
     pub log_server_port: u32,
 }
 

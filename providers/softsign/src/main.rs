@@ -1,7 +1,7 @@
 mod config;
 mod key_utils;
 mod state;
-use clap::StructOpt;
+use clap::Parser;
 use state::StateHolder;
 use std::{fmt::Debug, os::unix::net::UnixStream};
 use std::{fs, path::PathBuf};
@@ -18,38 +18,38 @@ use tmkms_light::{
 use tracing::{debug, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[command(
     name = "tmkms-softsign",
     about = "software signing for testing purposes"
 )]
 enum TmkmsLight {
-    #[structopt(name = "init", about = "Create config + keygen")]
+    #[command(name = "init", about = "Create config + keygen")]
     /// Create config + keygen
     Init {
-        #[structopt(short)]
+        #[arg(short)]
         config_path: Option<PathBuf>,
     },
-    #[structopt(name = "start", about = "start tmkms process")]
+    #[command(name = "start", about = "start tmkms process")]
     /// start tmkms process
     Start {
-        #[structopt(short)]
+        #[arg(short)]
         config_path: Option<PathBuf>,
     },
-    #[structopt(name = "pubkey", about = "display consensus public key")]
+    #[command(name = "pubkey", about = "display consensus public key")]
     /// displays consensus public key
     Pubkey {
-        #[structopt(short)]
+        #[arg(short)]
         config_path: Option<PathBuf>,
-        #[structopt(short)]
+        #[arg(short)]
         ptype: Option<PubkeyDisplay>,
-        #[structopt(short)]
+        #[arg(short)]
         bech32_prefix: Option<String>,
     },
 }
 
 fn main() {
-    let opt = TmkmsLight::from_args();
+    let opt = TmkmsLight::parse();
     match opt {
         TmkmsLight::Init { config_path } => {
             let cp = config_path.unwrap_or_else(|| "tmkms.toml".into());
