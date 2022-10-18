@@ -122,7 +122,7 @@ pub fn check_vsock_proxy() -> bool {
     system.refresh_all();
     system.processes().iter().any(|(_pid, p)| {
         let cmd = p.cmd();
-        cmd.contains(&"vsock-proxy".to_string())
+        cmd.iter().any(|x| x.contains("vsock-proxy"))
     })
 }
 
