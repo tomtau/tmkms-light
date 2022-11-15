@@ -28,9 +28,9 @@ dependencies = [
 
 [[package]]
 name = "aead"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae06cea71059b6b79d879afcdd237a33ac61afc052fdd605815e6f3916254abf"
+checksum = "5c192eb8f11fc081b0fe4259ba5af04217d4e0faddd02417310a927911abd7c8"
 dependencies = [
  "crypto-common",
  "generic-array",
@@ -44,7 +44,7 @@ checksum = "433cfd6710c9986c576a25ca913c39d66a6474107b406f34f91d4a8923395241"
 dependencies = [
  "cfg-if 1.0.0",
  "cipher 0.4.3",
- "cpufeatures 0.2.2",
+ "cpufeatures 0.2.5",
 ]
 
 [[package]]
@@ -53,7 +53,7 @@ version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae0784134ba9375416d469ec31e7c5f9fa94405049cf08c5ce5b4698be673e0d"
 dependencies = [
- "aead 0.5.0",
+ "aead 0.5.1",
  "aes",
  "cipher 0.4.3",
  "ctr",
@@ -567,9 +567,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.22"
+version = "4.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91b9970d7505127a162fdaa9b96428d28a479ba78c9ec7550a63a5d9863db682"
+checksum = "60494cedb60cb47462c0ff7be53de32c0e42a6fc2c772184554fa12bd9489c03"
 dependencies = [
  "atty",
  "bitflags",
@@ -635,9 +635,9 @@ dependencies = [
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.2"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59a6001667ab124aebae2a495118e11d30984c3a653e99d86d58971708cf5e4b"
+checksum = "28d997bd5e24a5928dd43e46dc529867e207907fe0b239c3477d924f7f2ca320"
 dependencies = [
  "libc",
 ]
@@ -1978,7 +1978,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "048aeb476be11a4b6ca432ca569e375810de9294ae78f4774e78ea98a9246ede"
 dependencies = [
- "cpufeatures 0.2.2",
+ "cpufeatures 0.2.5",
  "opaque-debug",
  "universal-hash 0.4.1",
 ]
@@ -1990,7 +1990,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ef234e08c11dfcb2e56f79fd70f6f2eb7f025c0ce2333e82f4f0518ecad30c6"
 dependencies = [
  "cfg-if 1.0.0",
- "cpufeatures 0.2.2",
+ "cpufeatures 0.2.5",
  "opaque-debug",
  "universal-hash 0.5.0",
 ]
@@ -2507,7 +2507,7 @@ checksum = "4d58a1e1bf39749807d89cf2d98ac2dfa0ff1cb3faa38fbb64dd88ac8013d800"
 dependencies = [
  "block-buffer 0.9.0",
  "cfg-if 1.0.0",
- "cpufeatures 0.2.2",
+ "cpufeatures 0.2.5",
  "digest 0.9.0",
  "opaque-debug",
 ]
@@ -2519,7 +2519,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82e6b795fe2e3b1e845bafcb27aa35405c4d47cdfc92af5fc8d3002f76cebdc0"
 dependencies = [
  "cfg-if 1.0.0",
- "cpufeatures 0.2.2",
+ "cpufeatures 0.2.5",
  "digest 0.10.5",
 ]
 
