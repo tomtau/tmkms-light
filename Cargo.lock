@@ -97,17 +97,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb07d2053ccdbe10e2af2995a2f116c1330396493dc1269f6a91d0ae82e19704"
 
 [[package]]
-name = "async-trait"
-version = "0.1.56"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96cf8829f67d2eab0b2dfa42c5d0ef737e0724e4a82b01b3e292456202b19716"
-dependencies = [
- "proc-macro2 1.0.47",
- "quote 1.0.20",
- "syn 1.0.104",
-]
-
-[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2744,11 +2733,10 @@ dependencies = [
 
 [[package]]
 name = "tendermint"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "baa1d2d0ec1b531ba7d196f0dbee5e78ed2a82bfba928e88dff64aeec0b26073"
+checksum = "eeb6f9c129bc9f1a3c38bc91c63a5e8d3c00ed998e7fa4ca44e06467466d0e77"
 dependencies = [
- "async-trait",
  "bytes 1.2.1",
  "ed25519",
  "ed25519-dalek",
@@ -2773,9 +2761,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-config"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "202a2f19502c03b353d8157694ed24fbc58c3dd64a92a5b0cb80b79c82af5be4"
+checksum = "414d0e7b47e20accc2e950fa623e76269eb0daeb8a20b6d7af2a61211f2806bf"
 dependencies = [
  "flex-error",
  "serde",
@@ -2787,9 +2775,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-p2p"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c57ec9225a58f516a167a93d77af49c38bd18d048d1d5d3f29b8897654c2f89b"
+checksum = "8edfb0bd5755b9a0ac6b7c9c719861871c06979232c24b7dd6e39bedee0b1b7a"
 dependencies = [
  "aead 0.4.3",
  "chacha20poly1305",
@@ -2813,9 +2801,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-proto"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "974d6330a19dfa6720e9f663fc59101d207a817db3f9c730d3f31caaa565b574"
+checksum = "d5895470f28c530f8ae8c4071bf8190304ce00bd131d25e81730453124a3375c"
 dependencies = [
  "bytes 1.2.1",
  "flex-error",
@@ -2831,9 +2819,9 @@ dependencies = [
 
 [[package]]
 name = "tendermint-std-ext"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a55634964426a5f42c9b542d87889acc5cf3f82c4236ee5a276fb06a65b1e9e"
+checksum = "15845aa4e492117f90ffaa3d86c71a3670029618b05ace7029d6228bd1e8f01e"
 
 [[package]]
 name = "termcolor"
