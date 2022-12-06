@@ -9,7 +9,7 @@ aws-ne-sys = "0.4"
 aws-nitro-enclaves-nsm-api = "0.2"
 ed25519-dalek = "1"
 flex-error = "0.4"
-nix = "0.25"
+nix = "0.26"
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 serde_bytes = "0.11"
 serde_json = "1"
