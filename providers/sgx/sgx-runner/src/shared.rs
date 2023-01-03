@@ -247,8 +247,12 @@ pub enum SgxInitResponse {
 pub fn get_claim(wrap_pub_key: &rsa::RsaPublicKey) -> String {
     let n = wrap_pub_key.n().to_bytes_be();
     let e = wrap_pub_key.e().to_bytes_be();
-    let encoded_n = base64::encode_config(&n, base64::URL_SAFE);
-    let encoded_e = base64::encode_config(&e, base64::URL_SAFE);
+    let url_safe_engine = base64::engine::fast_portable::FastPortable::from(
+        &base64::alphabet::URL_SAFE,
+        base64::engine::fast_portable::PAD,
+    );
+    let encoded_n = base64::encode_engine(&n, &url_safe_engine);
+    let encoded_e = base64::encode_engine(&e, &url_safe_engine);
     format!(
         "{{\"kid\":\"wrapping-key\",\"kty\":\"RSA\",\"e\":\"{}\",\"n\":\"{}\"}}",
         encoded_e, encoded_n

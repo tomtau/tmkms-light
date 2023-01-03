@@ -179,6 +179,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain $RUST_TOOLC
 
 # NSM LIB
 ENV AWS_NE_NSM_API_VER="v0.2.1"
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 RUN git clone "https://github.com/aws/aws-nitro-enclaves-nsm-api" \
     && cd aws-nitro-enclaves-nsm-api \
     && git reset --hard $AWS_NE_NSM_API_VER \
@@ -201,7 +202,9 @@ RUN git clone "https://github.com/aws/aws-nitro-enclaves-sdk-c" \
 
 ENV PATH="/root/.cargo/bin:$PATH"
 
-FROM build_env as builder
+FROM --platform=$TARGETPLATFORM build_env as builder
+
+ARG TARGETPLATFORM
 
 WORKDIR /tmkms-light
 
@@ -209,11 +212,18 @@ USER root
 
 COPY . .
 
-RUN cargo build \
-        --target=x86_64-unknown-linux-musl \
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
+
+RUN if [ "$TARGETPLATFORM" == "linux/amd64" ]; then \
+        export CARGO_BUILD_TARGET=x86_64-unknown-linux-musl; \
+    elif [ "$TARGETPLATFORM" == "linux/arm64" ]; then \
+        export CARGO_BUILD_TARGET=aarch64-unknown-linux-musl; \
+    fi; \
+    cargo build \
+    --target=${CARGO_BUILD_TARGET} \
         --package tmkms-nitro-enclave \
         --release \
-    && cp target/x86_64-unknown-linux-musl/release/tmkms-nitro-enclave /usr/bin/tmkms-nitro-enclave
+    && cp target/${CARGO_BUILD_TARGET}/release/tmkms-nitro-enclave /usr/bin/tmkms-nitro-enclave
 
 WORKDIR /rootfs
 

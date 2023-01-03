@@ -5,7 +5,7 @@ authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>", "Linfeng Yu
 edition = "2021"
 
 [dependencies]
-base64 = "0.13"
+base64 = "0.20"
 serde = { version = "1", features = ["derive"] }
 ed25519 = { version = "1", features = ["serde"] }
 ed25519-dalek =  { version = "1", features = ["serde"] }

@@ -227,15 +227,19 @@ pub mod tests {
         let nb64 = "kyk2V71OnhuVJAZq5occtRdYxX6eGiR3qQ04UKTZQxesiU3UsnbCq7FURSEr5NTKaU1L3die6VzPn829jdVYiht55hiqsEPYrRutNtmc-dI111lPGmkSaN_WcrK9rScbNn1btnBytf6KkST5Qmeri_Ue_BBjdg_G_WPNFKy1Ds_8lDqDMl3JLHaEjtKA-OtCjNsClzqtavgMJcbxdvHqUB1grbYePM6HrlMyIY1wZUvmdZw3_gwKbNkj5_whq6jYHSG68HdH3QGdbbV8_LFdB4IcfdN0ERXbuo1_0ZXoSd-koSjhfafuBbzrKGwiyzbDm9bSaocnECqENXASMt-YLQ==";
         let eb64 = "AQAB";
 
-        let nb = base64::decode_config(&nb64, base64::URL_SAFE).unwrap();
-        let eb = base64::decode_config(&eb64, base64::URL_SAFE).unwrap();
+        let url_safe_engine = base64::engine::fast_portable::FastPortable::from(
+            &base64::alphabet::URL_SAFE,
+            base64::engine::fast_portable::PAD,
+        );
+        let nb = base64::decode_engine(&nb64, &url_safe_engine).unwrap();
+        let eb = base64::decode_engine(&eb64, &url_safe_engine).unwrap();
         let n = BigUint::from_bytes_be(&nb);
         let e = BigUint::from_bytes_be(&eb);
         let pubkey = RsaPublicKey::new(n, e).unwrap();
         let n = pubkey.n().to_bytes_be();
         let e = pubkey.e().to_bytes_be();
-        let encoded_n = base64::encode_config(&n, base64::URL_SAFE);
-        let encoded_e = base64::encode_config(&e, base64::URL_SAFE);
+        let encoded_n = base64::encode_engine(&n, &url_safe_engine);
+        let encoded_e = base64::encode_engine(&e, &url_safe_engine);
         assert_eq!(nb64, encoded_n);
         assert_eq!(eb64, encoded_e);
     }
