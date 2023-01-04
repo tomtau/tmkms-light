@@ -1,3 +1,13 @@
+*January 5, 2023*
+
+Many dependency upgrades, support for multi-arch Nitro images, and a small bug fix.
+
+## v0.4.2
+### Improvements
+* [486](https://github.com/crypto-com/tmkms-light/pull/486) arm64 support in the Nitro image
+### Bug Fixes
+* [409](https://github.com/crypto-com/tmkms-light/pull/409) possible panics fixed in the Nitro logging
+
 *August 9, 2022*
 
 A bug fix for the SGX provider and a few dependency upgrades.

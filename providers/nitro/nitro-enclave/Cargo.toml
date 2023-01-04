@@ -1,6 +1,6 @@
 [package]
 name = "tmkms-nitro-enclave"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>"]
 edition = "2021"
 
@@ -15,8 +15,8 @@ serde_bytes = "0.11"
 serde_json = "1"
 subtle = "2"
 subtle-encoding = "0.5"
-tendermint = "0.27"
-tendermint-p2p = "0.27"
+tendermint = "0.28"
+tendermint-p2p = "0.28"
 tmkms-light = { path = "../../.." }
 tmkms-nitro-helper = { path = "../nitro-helper", default-features = false }
 tracing = "0.1"
