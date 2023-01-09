@@ -239,15 +239,15 @@ fn put_value(buf: &mut Vec<u8>, value: &[u8]) {
     buf.push(b'\n');
 }
 
-fn get_log_level(raw_level: &[u8; 1]) -> Level {
-    match raw_level {
+fn get_log_level(raw_level: &[u8; 1]) -> std::io::Result<Level> {
+    Ok(match raw_level {
         b"3" => Level::ERROR,
         b"4" => Level::WARN,
         b"5" => Level::INFO,
         b"6" => Level::DEBUG,
         b"7" => Level::TRACE,
-        _ => unreachable!(),
-    }
+        _ => return Err(std::io::ErrorKind::InvalidData.into()),
+    })
 }
 
 fn get_raw_level(level: &Level) -> &[u8; 1] {
@@ -317,6 +317,11 @@ impl Log {
                 let index_value_len_begin = index_key_end + 1;
                 let index_value_len_end = index_value_len_begin + 8;
 
+                if raw.len() <= index_value_len_end {
+                    warn!("missing value bytes after key");
+                    break;
+                }
+
                 let mut value_len_raw = [0; 8];
                 value_len_raw.copy_from_slice(&raw[index_value_len_begin..index_value_len_end]);
                 let value_len_u64 = u64::from_le_bytes(value_len_raw);
@@ -353,7 +358,10 @@ impl Log {
             "PRIORITY" => {
                 let mut v = [0; 1];
                 v.copy_from_slice(value_raw);
-                let value = get_log_level(&v);
+                let value = match get_log_level(&v) {
+                    Ok(level) => level,
+                    Err(_) => return,
+                };
                 self.level = value;
             }
             "MESSAGE" => {
@@ -377,5 +385,120 @@ impl Log {
                 self.debug.insert(key.to_lowercase(), value);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn value_len_too_big() {
+        let mut bytes: Vec<u8> = vec![];
+        bytes.extend_from_slice("TARGET".as_bytes());
+        bytes.push(0x0a);
+        bytes.append(&mut vec![0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+        assert_eq!("TRACE: [] :0 ", run_test(&bytes).unwrap().as_str());
+    }
+
+    #[test]
+    fn value_len_missing_bytes() {
+        let mut bytes: Vec<u8> = vec![];
+        bytes.extend_from_slice("TARGET".as_bytes());
+        bytes.push(0x0a);
+        bytes.push(0x01);
+        assert_eq!("TRACE: [] :0 ", run_test(&bytes).unwrap().as_str());
+    }
+
+    #[test]
+    fn normal_log() {
+        let mut bytes: Vec<u8> = vec![];
+        bytes.extend_from_slice("PRIORITY".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(1));
+        bytes.extend_from_slice("3".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice("TARGET".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(8));
+        bytes.extend_from_slice("acquired".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice("MESSAGE".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(5));
+        bytes.extend_from_slice("Hello".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice("CODE_FILE".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(4));
+        bytes.extend_from_slice("file".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice("CODE_LINE".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(2));
+        bytes.extend_from_slice("10".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice("OTHER1".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(3));
+        bytes.extend_from_slice("aaa".as_bytes());
+        bytes.push(0x0a);
+        assert_eq!(
+            "ERROR: [acquired] file:10 Hello, other1=aaa",
+            run_test(&bytes).unwrap().as_str()
+        );
+    }
+
+    #[test]
+    fn invalid_priority() {
+        let mut bytes: Vec<u8> = vec![];
+        bytes.extend_from_slice("PRIORITY".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(1));
+        bytes.extend_from_slice("2".as_bytes());
+        bytes.push(0x0a);
+        assert_eq!("TRACE: [] :0 ", run_test(&bytes).unwrap().as_str());
+    }
+
+    #[test]
+    fn invalid_code_line() {
+        let mut bytes: Vec<u8> = vec![];
+        bytes.extend_from_slice("CODE_LINE".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(2));
+        bytes.extend_from_slice("2z".as_bytes());
+        bytes.push(0x0a);
+        assert_eq!("TRACE: [] :0 ", run_test(&bytes).unwrap().as_str());
+    }
+
+    #[test]
+    fn invalid_utf8_key() {
+        let mut bytes: Vec<u8> = vec![];
+        bytes.push(0xe0);
+        bytes.push(0x80);
+        bytes.push(0x80);
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(5));
+        bytes.extend_from_slice("VALUE".as_bytes());
+        bytes.push(0x0a);
+        assert_eq!("TRACE: [] :0 ", run_test(&bytes).unwrap().as_str());
+    }
+
+    #[test]
+    fn invalid_utf8_value() {
+        let mut bytes: Vec<u8> = vec![];
+        bytes.extend_from_slice("MESSAGE".as_bytes());
+        bytes.push(0x0a);
+        bytes.extend_from_slice(&u64::to_le_bytes(3));
+        bytes.push(0xe0);
+        bytes.push(0x80);
+        bytes.push(0x80);
+        bytes.push(0x0a);
+        assert_eq!("TRACE: [] :0 ", run_test(&bytes).unwrap().as_str());
+    }
+
+    fn run_test(bytes: &[u8]) -> std::io::Result<String> {
+        let log = crate::tracing_layer::Log::from_raw(&bytes)?;
+        let level = log.level.as_str();
+        let formatted = log.format();
+        Ok(format!("{level}: {formatted}"))
     }
 }
