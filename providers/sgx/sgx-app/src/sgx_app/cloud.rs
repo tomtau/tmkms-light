@@ -11,7 +11,7 @@ use aes_gcm_siv::{
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use rand::rngs::OsRng;
 use rand::RngCore;
-use rsa::pkcs1::{der::Document, DecodeRsaPrivateKey, EncodeRsaPrivateKey};
+use rsa::pkcs1::{DecodeRsaPrivateKey, EncodeRsaPrivateKey};
 use rsa::{PaddingScheme, RsaPrivateKey, RsaPublicKey};
 use sgx_isa::ErrorCode;
 use sgx_isa::{Report, Targetinfo};
@@ -60,7 +60,7 @@ pub fn generate_keypair(
     let pkcs1 = priv_key.to_pkcs1_der();
     priv_key.zeroize();
     if let Ok(secret) = pkcs1 {
-        match crate::sgx_app::keypair_seal::seal_secret(csprng, secret.as_der(), result.into()) {
+        match crate::sgx_app::keypair_seal::seal_secret(csprng, &secret.to_bytes(), result.into()) {
             Ok(sealed_secret) => Ok((pub_key, sealed_secret, report)),
             Err(e) => Err(CloudError::SealingError(e)),
         }
@@ -175,6 +175,7 @@ pub fn seal_recover_cloud_backup(
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use base64::{engine::general_purpose, Engine as _};
     use ed25519_dalek::Keypair;
     use rand::RngCore;
     use rsa::BigUint;
@@ -227,19 +228,15 @@ pub mod tests {
         let nb64 = "kyk2V71OnhuVJAZq5occtRdYxX6eGiR3qQ04UKTZQxesiU3UsnbCq7FURSEr5NTKaU1L3die6VzPn829jdVYiht55hiqsEPYrRutNtmc-dI111lPGmkSaN_WcrK9rScbNn1btnBytf6KkST5Qmeri_Ue_BBjdg_G_WPNFKy1Ds_8lDqDMl3JLHaEjtKA-OtCjNsClzqtavgMJcbxdvHqUB1grbYePM6HrlMyIY1wZUvmdZw3_gwKbNkj5_whq6jYHSG68HdH3QGdbbV8_LFdB4IcfdN0ERXbuo1_0ZXoSd-koSjhfafuBbzrKGwiyzbDm9bSaocnECqENXASMt-YLQ==";
         let eb64 = "AQAB";
 
-        let url_safe_engine = base64::engine::fast_portable::FastPortable::from(
-            &base64::alphabet::URL_SAFE,
-            base64::engine::fast_portable::PAD,
-        );
-        let nb = base64::decode_engine(&nb64, &url_safe_engine).unwrap();
-        let eb = base64::decode_engine(&eb64, &url_safe_engine).unwrap();
+        let nb = general_purpose::URL_SAFE.decode(&nb64).unwrap();
+        let eb = general_purpose::URL_SAFE.decode(&eb64).unwrap();
         let n = BigUint::from_bytes_be(&nb);
         let e = BigUint::from_bytes_be(&eb);
         let pubkey = RsaPublicKey::new(n, e).unwrap();
         let n = pubkey.n().to_bytes_be();
         let e = pubkey.e().to_bytes_be();
-        let encoded_n = base64::encode_engine(&n, &url_safe_engine);
-        let encoded_e = base64::encode_engine(&e, &url_safe_engine);
+        let encoded_n = general_purpose::URL_SAFE.encode(&n);
+        let encoded_e = general_purpose::URL_SAFE.encode(&e);
         assert_eq!(nb64, encoded_n);
         assert_eq!(eb64, encoded_e);
     }
@@ -298,11 +295,15 @@ BTDF9yEwtrEQ1/xuPQMv8x6cnZFYH0ljjbXcTh6VJNv03MSC30pAQCrLSLl3nvHk
                 data.push_str(&line);
                 data
             });
-        let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
+        let der_bytes = general_purpose::STANDARD
+            .decode(&der_encoded)
+            .expect("failed to decode base64 content");
         let secret = RsaPrivateKey::from_pkcs1_der(&der_bytes).expect("failed to parse key");
 
         let encrypted_key = "nsohDxPYH9/iyLQvMujkFiTUJr5IiYfNrnYo0hoqoo0rFlUYw995X2REbsogKYcfqWQz7Rld6zEqLfBnD2ess+6pN6O+e1HXxmp6mNXxSAMl2rKGf08Ahl3XbQw0vQ7TNOGGdTlQoli2zbIKE/OsUl5DMqpjSyjDxNDJsKDis65tlnf39k1iMqjYLZMzUZEKTv5Sv16sKhk6TKyvaScNOOd+ctzVay8YFCh0cV9TT4rF/pq64RmX/T8VUTRAgUq/kAt7ZJYw/f2kILMBbBvugc00dq0WxQ+QRC6vDLhxZTxkLDBLHxLxeLlYpVbMMe83uxLcfCoXNOg5og3XeNRMpBNs/asA+eScIlW50xPbpzel9l0AZ9PEu2LAjBjcTAikGdigjKMuDEc=";
-        let enckey_payload = base64::decode(&encrypted_key).expect("decode enc key");
+        let enckey_payload = general_purpose::STANDARD
+            .decode(&encrypted_key)
+            .expect("decode enc key");
         assert_eq!(enckey_payload.len(), 296);
         let seal = CloudBackupSeal::new(enckey_payload).expect("seal");
         let sealing_key = decrypt_wrapped_key(&secret, seal).expect("sealing key");

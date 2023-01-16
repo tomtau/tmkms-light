@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose, Engine as _};
 use rsa::PublicKeyParts;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use sgx_isa::{Keypolicy, Keyrequest, Report, Targetinfo};
@@ -177,7 +178,7 @@ impl fmt::Display for CloudBackupSeal {
             &self.wrapped_cloud_sealing_key[..],
         ]
         .concat();
-        let full_str = base64::encode(&full);
+        let full_str = general_purpose::STANDARD.encode(&full);
         write!(f, "{}", full_str)
     }
 }
@@ -186,7 +187,7 @@ impl FromStr for CloudBackupSeal {
     type Err = base64::DecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = base64::decode(s)?;
+        let bytes = general_purpose::STANDARD.decode(s)?;
         CloudBackupSeal::new(bytes).ok_or(base64::DecodeError::InvalidLength)
     }
 }
@@ -247,12 +248,8 @@ pub enum SgxInitResponse {
 pub fn get_claim(wrap_pub_key: &rsa::RsaPublicKey) -> String {
     let n = wrap_pub_key.n().to_bytes_be();
     let e = wrap_pub_key.e().to_bytes_be();
-    let url_safe_engine = base64::engine::fast_portable::FastPortable::from(
-        &base64::alphabet::URL_SAFE,
-        base64::engine::fast_portable::PAD,
-    );
-    let encoded_n = base64::encode_engine(&n, &url_safe_engine);
-    let encoded_e = base64::encode_engine(&e, &url_safe_engine);
+    let encoded_n = general_purpose::URL_SAFE.encode(&n);
+    let encoded_e = general_purpose::URL_SAFE.encode(&e);
     format!(
         "{{\"kid\":\"wrapping-key\",\"kty\":\"RSA\",\"e\":\"{}\",\"n\":\"{}\"}}",
         encoded_e, encoded_n

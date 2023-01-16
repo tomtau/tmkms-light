@@ -5,11 +5,11 @@ authors = ["Tomas Tauber <2410580+tomtau@users.noreply.github.com>", "Linfeng Yu
 edition = "2021"
 
 [dependencies]
-base64 = "0.20"
+base64 = "0.21"
 serde = { version = "1", features = ["derive"] }
 ed25519 = { version = "1", features = ["serde"] }
 ed25519-dalek =  { version = "1", features = ["serde"] }
-rsa = { version = "0.6", features = ["serde", "std"] }
+rsa = { version = "0.7", features = ["serde", "std"] }
 sgx-isa = { version = "0.4", features = ["serde"] }
 tendermint = "0.28"
 tendermint-config = "0.28"

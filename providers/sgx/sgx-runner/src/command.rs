@@ -2,6 +2,7 @@ use crate::config::RecoverConfig;
 use crate::shared::{CloudBackupKey, CloudBackupSeal, SealedKeyData};
 use crate::{config, runner::TmkmsSgxSigner};
 use crate::{shared::get_claim, shared::SgxInitResponse, SgxInitRequest};
+use base64::{engine::general_purpose, Engine as _};
 
 use rsa::pkcs1::{EncodeRsaPublicKey, LineEnding};
 use std::fs;
@@ -66,12 +67,8 @@ pub fn keywrap(
                 .map_err(|e| format!("failed to write wrapping key: {:?}", e))?;
             if let Some(quote) = quote {
                 let claim_payload = get_claim(&wrap_pub_key);
-                let url_safe_engine = base64::engine::fast_portable::FastPortable::from(
-                    &base64::alphabet::URL_SAFE,
-                    base64::engine::fast_portable::PAD,
-                );
-                let encoded_claim = base64::encode_engine(&claim_payload, &url_safe_engine);
-                let encoded_quote = base64::encode_engine(&quote, &url_safe_engine);
+                let encoded_claim = general_purpose::URL_SAFE.encode(&claim_payload);
+                let encoded_quote = general_purpose::URL_SAFE.encode(&quote);
                 print!("{{\"quote\": \"{}\",", encoded_quote);
                 println!(
                     "\"runtimeData\": {{ \"data\": \"{}\", \"dataType\": \"Binary\" }}}}",
