@@ -9,7 +9,7 @@ use vsock::VsockAddr;
 pub(crate) mod credential {
     use crate::shared::AwsCredentials;
     use aws_config::imds::credentials;
-    use aws_types::credentials::ProvideCredentials;
+    use aws_credential_types::provider::ProvideCredentials;
     use tokio::runtime::Builder;
 
     /// get credentials from Aws Instance Metadata Service Version 2
