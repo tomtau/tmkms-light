@@ -21,7 +21,7 @@ tendermint = "0.28"
 tendermint-config = "0.28"
 tmkms-light = { path = "../../.." }
 tokio = { version = "1", features = [ "rt" ] }
-toml = "0.5"
+toml = "0.7"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tracing-core = "0.1"

@@ -22,5 +22,5 @@ tendermint-p2p = "0.28"
 tmkms-light = { path = "../.." }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-toml = "0.5"
+toml = "0.7"
 zeroize = "1"
