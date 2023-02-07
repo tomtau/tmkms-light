@@ -47,7 +47,8 @@ jobs:
       # RUSTSEC-2020-0071: time crate used in upstream sgxs-* crates
       # RUSTSEC-2021-0127: serde_cbor used in upstream nsm-* crates
       # RUSTSEC-2020-0016,RUSTSEC-2021-0124: net2 used in mio from older tokio (used in sgx crates)
-      # RUSTSEC-2022-0041: old cross-beam used in sgx runner crate
+      # RUSTSEC-2022-0041: old cross-beam used in the sgx runner crate
+      # RUSTSEC-2023-0005: old tokio used in the sgx runner crate (enclave-runner)
       - run: >
           cargo audit --deny warnings
           --ignore RUSTSEC-2020-0071
@@ -57,6 +58,7 @@ jobs:
           --ignore RUSTSEC-2021-0127
           --ignore RUSTSEC-2019-0036
           --ignore RUSTSEC-2022-0041
+          --ignore RUSTSEC-2023-0005
   
   build:
     runs-on: ubuntu-latest
