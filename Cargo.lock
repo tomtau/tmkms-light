@@ -2567,9 +2567,9 @@ dependencies = [
 
 [[package]]
 name = "serde_spanned"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c68e921cef53841b8925c2abadd27c9b891d9613bdc43d6b823062866df38e8"
+checksum = "0efd8caf556a6cebd3b285caf480045fcc1ac04f6bd786b09a6f11af30c4fcf4"
 dependencies = [
  "serde",
 ]
@@ -3035,7 +3035,7 @@ dependencies = [
  "tendermint-config",
  "tmkms-light",
  "tokio 0.2.25",
- "toml 0.7.0",
+ "toml 0.7.1",
  "tracing",
  "tracing-subscriber",
  "zeroize",
@@ -3085,7 +3085,7 @@ dependencies = [
  "tendermint-config",
  "tmkms-light",
  "tokio 1.25.0",
- "toml 0.7.0",
+ "toml 0.7.1",
  "tracing",
  "tracing-core",
  "tracing-subscriber",
@@ -3109,7 +3109,7 @@ dependencies = [
  "tendermint-config",
  "tendermint-p2p",
  "tmkms-light",
- "toml 0.7.0",
+ "toml 0.7.1",
  "tracing",
  "tracing-subscriber",
  "zeroize",
@@ -3224,9 +3224,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f560bc7fb3eb31f5eee1340c68a2160cad39605b7b9c9ec32045ddbdee13b85"
+checksum = "772c1426ab886e7362aedf4abc9c0d1348a979517efedfc25862944d10137af0"
 dependencies = [
  "serde",
  "serde_spanned",
@@ -3236,18 +3236,18 @@ dependencies = [
 
 [[package]]
 name = "toml_datetime"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "886f31a9b85b6182cabd4d8b07df3b451afcc216563748201490940d2a28ed36"
+checksum = "3ab8ed2edee10b50132aed5f331333428b011c99402b5a534154ed15746f9622"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "toml_edit"
-version = "0.19.0"
+version = "0.19.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "233d8716cdc5d20ec88a18a839edaf545edc71efa4a5ff700ef4a102c26cd8fa"
+checksum = "1f35c303ea3e062b6131be4de16debe23860b9d3f2396658f13b7af1987fb473"
 dependencies = [
  "indexmap",
  "nom8",
